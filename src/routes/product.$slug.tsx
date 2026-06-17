@@ -1,6 +1,6 @@
 import { createFileRoute, notFound, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { getProduct } from "@/lib/products";
+import { getProduct, type Product } from "@/lib/products";
 import { useCart } from "@/lib/cart";
 import { Reviews } from "@/components/site/Reviews";
 import { ReviewForm } from "@/components/site/ReviewForm";
@@ -35,7 +35,7 @@ export const Route = createFileRoute("/product/$slug")({
 });
 
 function ProductPage() {
-  const { product } = Route.useLoaderData();
+  const { product } = Route.useLoaderData() as { product: Product };
   const { add } = useCart();
   const [variantId, setVariantId] = useState(product.variants[0].id);
   const [qty, setQty] = useState(1);
