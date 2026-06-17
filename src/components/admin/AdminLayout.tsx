@@ -3,13 +3,15 @@ import { LayoutDashboard, Users, Package, Boxes, Store, LogOut, Truck, Briefcase
 import { useAuth, type AppRole } from "@/lib/auth";
 import { useEffect, type ReactNode } from "react";
 
-const adminLinks = [
+type NavLink = { to: string; label: string; icon: any; exact?: boolean };
+
+const adminLinks: NavLink[] = [
   { to: "/admin", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
   { to: "/admin/users", label: "Utilisateurs", icon: Users },
   { to: "/admin/products", label: "Produits", icon: Package },
   { to: "/admin/stock", label: "Stock", icon: Boxes },
   { to: "/admin/pos", label: "Points de vente", icon: Store },
-] as const;
+];
 
 export function StaffShell({
   children, title, requiredRole,
@@ -24,7 +26,7 @@ export function StaffShell({
     }
   }, [loading, roles, user, requiredRole, navigate]);
 
-  const links = requiredRole === "admin" ? adminLinks
+  const links: NavLink[] = requiredRole === "admin" ? adminLinks
     : requiredRole === "manager" ? [{ to: "/manager", label: "Manager", icon: Briefcase, exact: true }]
     : [{ to: "/livreur", label: "Livreur", icon: Truck, exact: true }];
 
@@ -39,7 +41,7 @@ export function StaffShell({
           {links.map((l) => {
             const active = l.exact ? pathname === l.to : pathname.startsWith(l.to);
             return (
-              <Link key={l.to} to={l.to} className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm transition ${
+              <Link key={l.to} to={l.to as any} className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm transition ${
                 active ? "bg-copper text-cream" : "text-cream/80 hover:bg-cream/5"
               }`}>
                 <l.icon className="w-4 h-4" strokeWidth={1.5} /> {l.label}

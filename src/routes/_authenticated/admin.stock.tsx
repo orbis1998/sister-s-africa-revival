@@ -35,7 +35,7 @@ function StockPage() {
   });
 
   const getStock = (pid: string) =>
-    stocks.find((s: any) => s.product_id === pid && (s.pos_id ?? "") === (selectedPos || null ?? ""));
+    stocks.find((s: any) => s.product_id === pid && (s.pos_id ?? "") === (selectedPos || ""));
 
   return (
     <StaffShell title="Administration" requiredRole="admin">
@@ -63,7 +63,7 @@ function StockPage() {
               const low = s && s.quantity <= s.low_stock_threshold;
               return (
                 <StockRow key={p.id} product={p} stock={s} low={!!low}
-                  onSave={(qty, threshold) => stockMut.mutate({
+                  onSave={(qty: number, threshold: number) => stockMut.mutate({
                     product_id: p.id, pos_id: selectedPos || null, quantity: qty, low_stock_threshold: threshold,
                   })} />
               );
