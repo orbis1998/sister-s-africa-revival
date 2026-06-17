@@ -5,6 +5,8 @@ import { countries, findCountry } from "@/lib/locations";
 import { MessageCircle, Loader2 } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { createOrder } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({ meta: [{ title: "Commande — The Sisters Africa" }] }),
@@ -24,6 +26,7 @@ const schema = z.object({
 function CheckoutPage() {
   const { items, totalFcfa, totalUsd, clear } = useCart();
   const navigate = useNavigate();
+  const placeOrder = useServerFn(createOrder);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
@@ -42,7 +45,7 @@ function CheckoutPage() {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (items.length === 0) {
       toast.error("Votre panier est vide");
@@ -55,8 +58,34 @@ function CheckoutPage() {
     }
     setSubmitting(true);
 
+    let orderNumber = "";
+    try {
+      const res = await placeOrder({ data: {
+        customer_name: parsed.data.fullName,
+        customer_phone: parsed.data.phone,
+        country_code: country.code,
+        country_name: country.name,
+        city: parsed.data.city,
+        commune: parsed.data.commune,
+        address: parsed.data.address,
+        notes: parsed.data.notes,
+        items: items.map((it) => ({
+          slug: it.slug, name: it.name, variantId: it.variantId, variantLabel: it.variantLabel,
+          qty: it.qty, priceUsd: it.priceUsd, priceFcfa: it.priceFcfa,
+        })),
+        total_fcfa: totalFcfa,
+        total_usd: totalUsd,
+      } });
+      orderNumber = (res as any)?.order_number ?? "";
+    } catch (err: any) {
+      toast.error("Enregistrement impossible : " + (err?.message ?? "erreur"));
+      setSubmitting(false);
+      return;
+    }
+
     const lines: string[] = [];
     lines.push("*Nouvelle commande — The Sisters*");
+    if (orderNumber) lines.push(`N° : ${orderNumber}`);
     lines.push("");
     lines.push("*Client*");
     lines.push(`• Nom : ${parsed.data.fullName}`);
@@ -79,7 +108,7 @@ function CheckoutPage() {
     const message = encodeURIComponent(lines.join("\n"));
     const url = `https://wa.me/${country.whatsapp}?text=${message}`;
 
-    toast.success("Redirection vers WhatsApp…");
+    toast.success("Commande enregistrée — redirection WhatsApp…");
     setTimeout(() => {
       window.open(url, "_blank");
       clear();
