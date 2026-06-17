@@ -1,7 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ShoppingBag, Menu, X } from "lucide-react";
+import { ShoppingBag, Menu, X, User } from "lucide-react";
 import { useState } from "react";
 import { useCart } from "@/lib/cart";
+import { useAuth, roleHome } from "@/lib/auth";
 
 const nav = [
   { to: "/", label: "Accueil" },
@@ -11,8 +12,10 @@ const nav = [
 
 export function Header() {
   const { count } = useCart();
+  const { user, roles } = useAuth();
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const accountHref = user ? roleHome(roles) : "/auth";
 
   return (
     <header className="sticky top-0 z-50 bg-cream/85 backdrop-blur-md border-b border-border/60">
@@ -38,6 +41,9 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-4">
+          <Link to={accountHref as any} className="p-2 text-espresso hover:text-copper transition-colors" aria-label="Compte">
+            <User className="w-5 h-5" strokeWidth={1.5} />
+          </Link>
           <Link
             to="/cart"
             className="relative p-2 text-espresso hover:text-copper transition-colors"
