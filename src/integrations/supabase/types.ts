@@ -14,7 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      reviews: {
+        Row: {
+          after_image_url: string | null
+          author_name: string
+          before_image_url: string | null
+          comment: string
+          created_at: string
+          id: string
+          location: string | null
+          product_slug: string
+          rating: number
+        }
+        Insert: {
+          after_image_url?: string | null
+          author_name: string
+          before_image_url?: string | null
+          comment: string
+          created_at?: string
+          id?: string
+          location?: string | null
+          product_slug: string
+          rating: number
+        }
+        Update: {
+          after_image_url?: string | null
+          author_name?: string
+          before_image_url?: string | null
+          comment?: string
+          created_at?: string
+          id?: string
+          location?: string | null
+          product_slug?: string
+          rating?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
