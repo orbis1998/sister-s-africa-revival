@@ -29,6 +29,7 @@ import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminStockRouteImport } from './routes/_authenticated/admin.stock'
 import { Route as AuthenticatedAdminProductsRouteImport } from './routes/_authenticated/admin.products'
 import { Route as AuthenticatedAdminPosRouteImport } from './routes/_authenticated/admin.pos'
+import { Route as AuthenticatedAdminLogisticsRouteImport } from './routes/_authenticated/admin.logistics'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -130,6 +131,12 @@ const AuthenticatedAdminPosRoute = AuthenticatedAdminPosRouteImport.update({
   path: '/pos',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminLogisticsRoute =
+  AuthenticatedAdminLogisticsRouteImport.update({
+    id: '/logistics',
+    path: '/logistics',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/manager': typeof AuthenticatedManagerRoute
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
+  '/admin/logistics': typeof AuthenticatedAdminLogisticsRoute
   '/admin/pos': typeof AuthenticatedAdminPosRoute
   '/admin/products': typeof AuthenticatedAdminProductsRoute
   '/admin/stock': typeof AuthenticatedAdminStockRoute
@@ -166,6 +174,7 @@ export interface FileRoutesByTo {
   '/manager': typeof AuthenticatedManagerRoute
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
+  '/admin/logistics': typeof AuthenticatedAdminLogisticsRoute
   '/admin/pos': typeof AuthenticatedAdminPosRoute
   '/admin/products': typeof AuthenticatedAdminProductsRoute
   '/admin/stock': typeof AuthenticatedAdminStockRoute
@@ -189,6 +198,7 @@ export interface FileRoutesById {
   '/_authenticated/manager': typeof AuthenticatedManagerRoute
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
+  '/_authenticated/admin/logistics': typeof AuthenticatedAdminLogisticsRoute
   '/_authenticated/admin/pos': typeof AuthenticatedAdminPosRoute
   '/_authenticated/admin/products': typeof AuthenticatedAdminProductsRoute
   '/_authenticated/admin/stock': typeof AuthenticatedAdminStockRoute
@@ -212,6 +222,7 @@ export interface FileRouteTypes {
     | '/manager'
     | '/login/$role'
     | '/product/$slug'
+    | '/admin/logistics'
     | '/admin/pos'
     | '/admin/products'
     | '/admin/stock'
@@ -232,6 +243,7 @@ export interface FileRouteTypes {
     | '/manager'
     | '/login/$role'
     | '/product/$slug'
+    | '/admin/logistics'
     | '/admin/pos'
     | '/admin/products'
     | '/admin/stock'
@@ -254,6 +266,7 @@ export interface FileRouteTypes {
     | '/_authenticated/manager'
     | '/login/$role'
     | '/product/$slug'
+    | '/_authenticated/admin/logistics'
     | '/_authenticated/admin/pos'
     | '/_authenticated/admin/products'
     | '/_authenticated/admin/stock'
@@ -417,10 +430,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPosRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/logistics': {
+      id: '/_authenticated/admin/logistics'
+      path: '/logistics'
+      fullPath: '/admin/logistics'
+      preLoaderRoute: typeof AuthenticatedAdminLogisticsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminLogisticsRoute: typeof AuthenticatedAdminLogisticsRoute
   AuthenticatedAdminPosRoute: typeof AuthenticatedAdminPosRoute
   AuthenticatedAdminProductsRoute: typeof AuthenticatedAdminProductsRoute
   AuthenticatedAdminStockRoute: typeof AuthenticatedAdminStockRoute
@@ -429,6 +450,7 @@ interface AuthenticatedAdminRouteChildren {
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminLogisticsRoute: AuthenticatedAdminLogisticsRoute,
   AuthenticatedAdminPosRoute: AuthenticatedAdminPosRoute,
   AuthenticatedAdminProductsRoute: AuthenticatedAdminProductsRoute,
   AuthenticatedAdminStockRoute: AuthenticatedAdminStockRoute,
