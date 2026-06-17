@@ -56,6 +56,69 @@ export type Database = {
         }
         Relationships: []
       }
+      orders: {
+        Row: {
+          address: string
+          assigned_to: string | null
+          city: string
+          commune: string
+          country_code: string
+          country_name: string
+          created_at: string
+          customer_name: string
+          customer_phone: string
+          delivered_at: string | null
+          id: string
+          items: Json
+          notes: string | null
+          order_number: string
+          status: Database["public"]["Enums"]["order_status"]
+          total_fcfa: number
+          total_usd: number
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          assigned_to?: string | null
+          city: string
+          commune: string
+          country_code: string
+          country_name: string
+          created_at?: string
+          customer_name: string
+          customer_phone: string
+          delivered_at?: string | null
+          id?: string
+          items?: Json
+          notes?: string | null
+          order_number?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          total_fcfa?: number
+          total_usd?: number
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          assigned_to?: string | null
+          city?: string
+          commune?: string
+          country_code?: string
+          country_name?: string
+          created_at?: string
+          customer_name?: string
+          customer_phone?: string
+          delivered_at?: string | null
+          id?: string
+          items?: Json
+          notes?: string | null
+          order_number?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          total_fcfa?: number
+          total_usd?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       points_of_sale: {
         Row: {
           address: string | null
@@ -311,6 +374,13 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "livreur" | "client"
+      order_status:
+        | "received"
+        | "preparing"
+        | "ready"
+        | "en_route"
+        | "delivered"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -439,6 +509,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "livreur", "client"],
+      order_status: [
+        "received",
+        "preparing",
+        "ready",
+        "en_route",
+        "delivered",
+        "cancelled",
+      ],
     },
   },
 } as const

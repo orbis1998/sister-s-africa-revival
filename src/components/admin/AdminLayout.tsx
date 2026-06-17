@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, Package, Boxes, Store, LogOut, Truck, Briefcase } from "lucide-react";
+import { LayoutDashboard, Users, Package, Boxes, Store, LogOut, Truck, Briefcase, ClipboardList } from "lucide-react";
 import { useAuth, type AppRole } from "@/lib/auth";
 import { useEffect, type ReactNode } from "react";
 
@@ -10,6 +10,7 @@ const adminLinks: NavLink[] = [
   { to: "/admin/users", label: "Utilisateurs", icon: Users },
   { to: "/admin/products", label: "Produits", icon: Package },
   { to: "/admin/stock", label: "Stock", icon: Boxes },
+  { to: "/admin/logistics", label: "Logistique", icon: ClipboardList },
   { to: "/admin/pos", label: "Points de vente", icon: Store },
 ];
 
