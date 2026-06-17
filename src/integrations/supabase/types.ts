@@ -14,6 +14,144 @@ export type Database = {
   }
   public: {
     Tables: {
+      manager_permissions: {
+        Row: {
+          can_manage_logistics: boolean
+          can_manage_orders: boolean
+          can_manage_pos: boolean
+          can_manage_products: boolean
+          can_manage_stock: boolean
+          can_manage_users: boolean
+          can_view_accounting: boolean
+          notes: string | null
+          pos_ids: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_manage_logistics?: boolean
+          can_manage_orders?: boolean
+          can_manage_pos?: boolean
+          can_manage_products?: boolean
+          can_manage_stock?: boolean
+          can_manage_users?: boolean
+          can_view_accounting?: boolean
+          notes?: string | null
+          pos_ids?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_manage_logistics?: boolean
+          can_manage_orders?: boolean
+          can_manage_pos?: boolean
+          can_manage_products?: boolean
+          can_manage_stock?: boolean
+          can_manage_users?: boolean
+          can_view_accounting?: boolean
+          notes?: string | null
+          pos_ids?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      points_of_sale: {
+        Row: {
+          address: string | null
+          city: string | null
+          created_at: string
+          id: string
+          name: string
+          phone: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          phone?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string | null
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          is_bestseller: boolean
+          name: string
+          price_fcfa: number
+          price_usd: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          is_bestseller?: boolean
+          name: string
+          price_fcfa?: number
+          price_usd?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          is_bestseller?: boolean
+          name?: string
+          price_fcfa?: number
+          price_usd?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          badge_id: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          badge_id?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          badge_id?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reviews: {
         Row: {
           after_image_url: string | null
@@ -50,15 +188,129 @@ export type Database = {
         }
         Relationships: []
       }
+      stock: {
+        Row: {
+          id: string
+          low_stock_threshold: number
+          pos_id: string | null
+          product_id: string
+          quantity: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          low_stock_threshold?: number
+          pos_id?: string | null
+          product_id: string
+          quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          low_stock_threshold?: number
+          pos_id?: string | null
+          product_id?: string
+          quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_pos_id_fkey"
+            columns: ["pos_id"]
+            isOneToOne: false
+            referencedRelation: "points_of_sale"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          delta: number
+          id: string
+          pos_id: string | null
+          product_id: string
+          reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          delta: number
+          id?: string
+          pos_id?: string | null
+          product_id: string
+          reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          delta?: number
+          id?: string
+          pos_id?: string | null
+          product_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_pos_id_fkey"
+            columns: ["pos_id"]
+            isOneToOne: false
+            referencedRelation: "points_of_sale"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "manager" | "livreur" | "client"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -185,6 +437,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "manager", "livreur", "client"],
+    },
   },
 } as const
