@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
-import { products } from "@/lib/products";
+import { fetchProducts } from "@/lib/products";
 
 const BASE_URL = "";
 
@@ -8,6 +8,12 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
+        let products: Awaited<ReturnType<typeof fetchProducts>> = [];
+        try {
+          products = await fetchProducts();
+        } catch (error) {
+          console.error("Sitemap products load failed", error);
+        }
         const entries = [
           { path: "/", changefreq: "weekly", priority: "1.0" },
           { path: "/products", changefreq: "weekly", priority: "0.9" },

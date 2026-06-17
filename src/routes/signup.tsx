@@ -53,7 +53,7 @@ function SignupPage() {
           </button>
         </form>
         <p className="text-center text-sm text-muted-foreground mt-6">
-          Déjà un compte ? <Link to="/login/$role" params={{ role: "client" }} className="text-copper underline">Connexion</Link>
+          Déjà un compte ? <Link to="/login" className="text-copper underline">Connexion</Link>
         </p>
       </div>
     </div>

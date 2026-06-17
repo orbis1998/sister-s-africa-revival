@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { adminCreateUser, adminListUsers, adminDeleteUser } from "@/lib/admin.functions";
 import { Trash2, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin/users")({
   component: UsersPage,
@@ -27,10 +28,14 @@ function UsersPage() {
   const createFn = useServerFn(adminCreateUser);
   const deleteFn = useServerFn(adminDeleteUser);
   const { data: users = [], isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: () => listFn({}) });
+  const { data: posList = [] } = useQuery({
+    queryKey: ["admin-pos-for-users"],
+    queryFn: async () => (await supabase.from("points_of_sale").select("id,name,city").order("name")).data ?? [],
+  });
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<any>({
     email: "", password: "", full_name: "", phone: "", badge_id: "",
-    role: "livreur", permissions: {},
+    role: "livreur", permissions: {}, pos_id: "",
   });
 
   const createMut = useMutation({
@@ -57,11 +62,11 @@ function UsersPage() {
         <table className="w-full text-sm">
           <thead className="bg-clay/50">
             <tr className="text-left text-xs uppercase tracking-widest">
-              <th className="p-3">Email</th><th className="p-3">Nom</th><th className="p-3">Badge</th><th className="p-3">Rôles</th><th></th>
+                  <th className="p-3">Email</th><th className="p-3">Nom</th><th className="p-3">Badge</th><th className="p-3">Rôles</th><th className="p-3">POS</th><th></th>
             </tr>
           </thead>
           <tbody>
-            {isLoading ? <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Chargement…</td></tr> :
+            {isLoading ? <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Chargement…</td></tr> :
               users.map((u: any) => (
                 <tr key={u.id} className="border-t border-border">
                   <td className="p-3">{u.email}</td>
@@ -72,6 +77,7 @@ function UsersPage() {
                       <span key={r} className="inline-block px-2 py-0.5 rounded bg-copper/15 text-copper text-xs mr-1">{r}</span>
                     ))}
                   </td>
+                  <td className="p-3 text-xs text-muted-foreground">{u.pos_account?.points_of_sale?.name ?? "—"}</td>
                   <td className="p-3 text-right">
                     <button onClick={() => confirm("Supprimer ce compte ?") && deleteMut.mutate(u.id)}
                       className="text-destructive hover:bg-destructive/10 p-2 rounded"><Trash2 className="w-4 h-4" /></button>
@@ -97,8 +103,20 @@ function UsersPage() {
                 <option value="admin">Administrateur</option>
                 <option value="manager">Manager</option>
                 <option value="livreur">Livreur</option>
+                <option value="pos">Point de vente</option>
               </select>
             </div>
+            {form.role === "pos" && (
+              <div className="mt-4">
+                <label className="text-xs uppercase tracking-widest mb-2 block">Point de vente associé</label>
+                <select value={form.pos_id} onChange={(e) => setForm({ ...form, pos_id: e.target.value })} className="w-full px-3 py-2 border border-border rounded bg-background">
+                  <option value="">Sélectionner un POS</option>
+                  {posList.map((p: any) => (
+                    <option key={p.id} value={p.id}>{p.name}{p.city ? ` · ${p.city}` : ""}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {form.role === "manager" && (
               <div className="mt-4">
                 <div className="text-xs uppercase tracking-widest mb-2">Permissions du manager</div>

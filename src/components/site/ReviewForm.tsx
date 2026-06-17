@@ -60,7 +60,7 @@ export function ReviewForm({ productSlug, onSubmitted }: { productSlug: string; 
         after_image_url: afterUrl,
       });
       if (error) throw error;
-      toast.success("Merci pour votre témoignage !");
+      toast.success("Merci ! Votre avis sera publié après validation.");
       setName("");
       setComment("");
       setLocation("");
@@ -149,9 +149,12 @@ export function ReviewForm({ productSlug, onSubmitted }: { productSlug: string; 
           {submitting ? (
             <><Loader2 className="w-4 h-4 animate-spin" /> Envoi…</>
           ) : (
-            "Publier mon avis"
+            "Envoyer mon avis"
           )}
         </button>
+        <p className="text-center text-[11px] text-muted-foreground">
+          Chaque avis est relu par notre équipe avant publication.
+        </p>
       </div>
     </form>
   );

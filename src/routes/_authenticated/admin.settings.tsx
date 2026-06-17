@@ -1,0 +1,135 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState, type ReactNode } from "react";
+import { toast } from "sonner";
+import { Loader2, Upload } from "lucide-react";
+import { StaffShell } from "@/components/admin/AdminLayout";
+import { supabase } from "@/integrations/supabase/client";
+import { adminUpdateSiteSettings } from "@/lib/admin.functions";
+import { defaultSiteSettings, fetchSiteSettings } from "@/lib/site-settings";
+
+export const Route = createFileRoute("/_authenticated/admin/settings")({
+  component: SettingsPage,
+});
+
+async function uploadSiteAsset(file: File) {
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `hero/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from("site-assets").upload(path, file, {
+    cacheControl: "31536000",
+    upsert: false,
+  });
+  if (error) throw error;
+  return supabase.storage.from("site-assets").getPublicUrl(path).data.publicUrl;
+}
+
+function SettingsPage() {
+  const updateSettings = useServerFn(adminUpdateSiteSettings);
+  const qc = useQueryClient();
+  const [form, setForm] = useState(defaultSiteSettings);
+
+  const settings = useQuery({
+    queryKey: ["site-settings-admin"],
+    queryFn: fetchSiteSettings,
+  });
+
+  useEffect(() => {
+    if (settings.data) setForm(settings.data);
+  }, [settings.data]);
+
+  const save = useMutation({
+    mutationFn: () => updateSettings({ data: form }),
+    onSuccess: () => {
+      toast.success("Paramètres enregistrés");
+      qc.invalidateQueries({ queryKey: ["site-settings-admin"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  async function onImage(index: number, file?: File) {
+    if (!file) return;
+    try {
+      const url = await uploadSiteAsset(file);
+      const next = [...(form.hero_images ?? [])];
+      next[index] = url;
+      setForm({ ...form, hero_images: next.slice(0, 3) });
+      toast.success("Image ajoutée");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
+
+  return (
+    <StaffShell title="Administration" requiredRole="admin">
+      <span className="eyebrow">Expérience client</span>
+      <h1 className="font-display text-4xl mt-2">Paramètres du site</h1>
+      <p className="text-sm text-muted-foreground mt-2">
+        Gérez ici le hero de l'accueil, les images défilantes, le CTA et le numéro WhatsApp.
+      </p>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="grid gap-4">
+            <Field label="Surtitre">
+              <input value={form.hero_eyebrow} onChange={(e) => setForm({ ...form, hero_eyebrow: e.target.value })} className="input-admin" />
+            </Field>
+            <Field label="Titre hero">
+              <input value={form.hero_title} onChange={(e) => setForm({ ...form, hero_title: e.target.value })} className="input-admin" />
+            </Field>
+            <Field label="Mot à mettre en or">
+              <input value={form.hero_highlight} onChange={(e) => setForm({ ...form, hero_highlight: e.target.value })} className="input-admin" />
+            </Field>
+            <Field label="Texte descriptif">
+              <textarea value={form.hero_subtitle} onChange={(e) => setForm({ ...form, hero_subtitle: e.target.value })} rows={4} className="input-admin resize-none" />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Label CTA">
+                <input value={form.cta_label} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} className="input-admin" />
+              </Field>
+              <Field label="Lien CTA">
+                <input value={form.cta_href} onChange={(e) => setForm({ ...form, cta_href: e.target.value })} className="input-admin" />
+              </Field>
+            </div>
+            <Field label="WhatsApp redirection (sans +)">
+              <input value={form.whatsapp_number} onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value })} className="input-admin" />
+            </Field>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="font-display text-2xl">Images hero</h2>
+          <p className="text-xs text-muted-foreground mt-1">Ajoutez jusqu'à 3 images pour l'effet défilant.</p>
+          <div className="mt-5 space-y-4">
+            {[0, 1, 2].map((index) => (
+              <label key={index} className="block cursor-pointer rounded-2xl border border-dashed border-border bg-cream/50 p-3">
+                <input type="file" accept="image/*" className="sr-only" onChange={(e) => onImage(index, e.target.files?.[0])} />
+                {form.hero_images?.[index] ? (
+                  <img src={form.hero_images[index]} alt={`Hero ${index + 1}`} className="h-32 w-full rounded-xl object-cover" />
+                ) : (
+                  <div className="flex h-32 flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <Upload className="w-5 h-5" />
+                    <span className="text-xs">Image {index + 1}</span>
+                  </div>
+                )}
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <button onClick={() => save.mutate()} disabled={save.isPending} className="btn-hero mt-8">
+        {save.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Enregistrement</> : "Enregistrer les paramètres"}
+      </button>
+    </StaffShell>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs uppercase tracking-widest text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  );
+}

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 
-export type AppRole = "admin" | "manager" | "livreur" | "client";
+export type AppRole = "admin" | "manager" | "livreur" | "client" | "pos";
 
 type AuthCtx = {
   user: User | null;
@@ -63,6 +63,7 @@ export const roleHome = (roles: AppRole[]) => {
   if (roles.includes("admin")) return "/admin";
   if (roles.includes("manager")) return "/manager";
   if (roles.includes("livreur")) return "/livreur";
+  if (roles.includes("pos")) return "/pos";
   return "/account";
 };
 
@@ -70,5 +71,6 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Administrateur",
   manager: "Manager",
   livreur: "Livreur",
+  pos: "Point de vente",
   client: "Client",
 };

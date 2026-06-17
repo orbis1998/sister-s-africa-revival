@@ -146,6 +146,63 @@ export type Database = {
         }
         Relationships: []
       }
+      pos_accounts: {
+        Row: {
+          created_at: string
+          pos_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          pos_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          pos_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pos_sales: {
+        Row: {
+          created_at: string
+          customer_name: string | null
+          customer_phone: string | null
+          id: string
+          items: Json
+          payment_method: string
+          pos_id: string
+          sold_by: string
+          total_fcfa: number
+          total_usd: number
+        }
+        Insert: {
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          items?: Json
+          payment_method?: string
+          pos_id: string
+          sold_by: string
+          total_fcfa?: number
+          total_usd?: number
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          items?: Json
+          payment_method?: string
+          pos_id?: string
+          sold_by?: string
+          total_fcfa?: number
+          total_usd?: number
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           created_at: string
@@ -157,6 +214,7 @@ export type Database = {
           name: string
           price_fcfa: number
           price_usd: number
+          quantity: number
           slug: string
           updated_at: string
         }
@@ -170,6 +228,7 @@ export type Database = {
           name: string
           price_fcfa?: number
           price_usd?: number
+          quantity?: number
           slug: string
           updated_at?: string
         }
@@ -183,6 +242,7 @@ export type Database = {
           name?: string
           price_fcfa?: number
           price_usd?: number
+          quantity?: number
           slug?: string
           updated_at?: string
         }
@@ -218,6 +278,9 @@ export type Database = {
       reviews: {
         Row: {
           after_image_url: string | null
+          approved: boolean
+          approved_at: string | null
+          approved_by: string | null
           author_name: string
           before_image_url: string | null
           comment: string
@@ -229,6 +292,9 @@ export type Database = {
         }
         Insert: {
           after_image_url?: string | null
+          approved?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
           author_name: string
           before_image_url?: string | null
           comment: string
@@ -240,6 +306,9 @@ export type Database = {
         }
         Update: {
           after_image_url?: string | null
+          approved?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
           author_name?: string
           before_image_url?: string | null
           comment?: string
@@ -248,6 +317,48 @@ export type Database = {
           location?: string | null
           product_slug?: string
           rating?: number
+        }
+        Relationships: []
+      }
+      site_settings: {
+        Row: {
+          cta_href: string
+          cta_label: string
+          hero_eyebrow: string
+          hero_highlight: string
+          hero_images: string[]
+          hero_subtitle: string
+          hero_title: string
+          id: boolean
+          updated_at: string
+          updated_by: string | null
+          whatsapp_number: string
+        }
+        Insert: {
+          cta_href?: string
+          cta_label?: string
+          hero_eyebrow?: string
+          hero_highlight?: string
+          hero_images?: string[]
+          hero_subtitle?: string
+          hero_title?: string
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          whatsapp_number?: string
+        }
+        Update: {
+          cta_href?: string
+          cta_label?: string
+          hero_eyebrow?: string
+          hero_highlight?: string
+          hero_images?: string[]
+          hero_subtitle?: string
+          hero_title?: string
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          whatsapp_number?: string
         }
         Relationships: []
       }
@@ -373,7 +484,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "manager" | "livreur" | "client"
+      app_role: "admin" | "manager" | "livreur" | "client" | "pos"
       order_status:
         | "received"
         | "preparing"
@@ -508,7 +619,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "livreur", "client"],
+      app_role: ["admin", "manager", "livreur", "client", "pos"],
       order_status: [
         "received",
         "preparing",

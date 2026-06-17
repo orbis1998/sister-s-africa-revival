@@ -62,7 +62,7 @@
   --card-foreground: var(--espresso);
   --popover: oklch(1 0 0);
   --popover-foreground: var(--espresso);
-  --primary: var(--copper);
+  --primary: var(--espresso);
   --primary-foreground: oklch(0.98 0.005 70);
   --secondary: var(--clay);
   --secondary-foreground: var(--espresso);
@@ -74,7 +74,7 @@
   --destructive-foreground: oklch(0.98 0.005 70);
   --border: oklch(0.86 0.025 65);
   --input: oklch(0.88 0.02 65);
-  --ring: var(--copper);
+  --ring: var(--espresso);
 
   --chart-1: var(--copper);
   --chart-2: var(--gold);
@@ -131,7 +131,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: var(--copper);
+  background: var(--espresso);
   color: var(--primary-foreground);
   padding: 0.9rem 1.75rem;
   font-size: 0.85rem;
@@ -169,5 +169,22 @@
   &:hover {
     background: var(--espresso);
     color: var(--cream);
+  }
+}
+
+@utility input-admin {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--background);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--espresso);
+}
+@utility input-admin {
+  &:focus {
+    outline: none;
+    border-color: var(--espresso);
+    box-shadow: 0 0 0 3px oklch(0.24 0.03 40 / 0.08);
   }
 }

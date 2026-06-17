@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import heroImg from "@/assets/hero.jpg";
-import { products } from "@/lib/products";
+import { fetchFeaturedProducts } from "@/lib/products";
+import { defaultSiteSettings, fetchSiteSettings, type SiteSettings } from "@/lib/site-settings";
 import { ProductCard } from "@/components/site/ProductCard";
 import { ArrowRight, Leaf, ShieldCheck, Truck, HeartHandshake } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -13,50 +15,56 @@ export const Route = createFileRoute("/")({
       { property: "og:image", content: heroImg },
     ],
   }),
+  loader: async () => {
+    try {
+      const [products, settings] = await Promise.all([
+        fetchFeaturedProducts().catch((error) => {
+          console.error("Featured products loader failed", error);
+          return [];
+        }),
+        fetchSiteSettings().catch((error) => {
+          console.error("Site settings loader failed", error);
+          return defaultSiteSettings;
+        }),
+      ]);
+      return { products, settings };
+    } catch (error) {
+      console.error("Home loader failed", error);
+      return { products: [], settings: defaultSiteSettings };
+    }
+  },
   component: HomePage,
 });
 
 function HomePage() {
+  const { products, settings } = Route.useLoaderData();
+
   return (
     <>
       {/* HERO */}
-      <section className="relative">
-        <div className="grid lg:grid-cols-2 min-h-[88vh]">
-          <div className="bg-cream flex items-center order-2 lg:order-1">
-            <div className="container-page py-16 lg:py-0 lg:px-16 max-w-2xl">
-              <div className="eyebrow mb-6">Powered by The Sisters · 100% Bio</div>
-              <h1 className="font-display text-5xl md:text-6xl lg:text-7xl text-espresso leading-[1.05] mb-8">
-                La prise de poids,<br />
-                <em className="text-copper not-italic">naturelle</em> et<br />
-                saine.
-              </h1>
-              <p className="text-base text-espresso/75 leading-relaxed max-w-md mb-10">
-                Des bouillies bio d'origine végétale, conçues en Afrique pour révéler vos courbes
-                et soutenir la croissance de vos enfants. Résultats visibles en deux semaines.
-              </p>
-              <div className="flex flex-wrap gap-4">
-                <Link to="/products" className="btn-hero">
-                  Découvrir la boutique <ArrowRight className="w-4 h-4" />
-                </Link>
-                <Link to="/product/$slug" params={{ slug: "mass-gainer" }} className="btn-ghost">
-                  Le Mass Gainer
-                </Link>
-              </div>
-              <div className="mt-12 pt-8 border-t border-border/60 flex items-center gap-8 text-xs text-muted-foreground">
-                <div><strong className="font-display text-espresso text-2xl block leading-none">10K+</strong> clientes satisfaites</div>
-                <div><strong className="font-display text-espresso text-2xl block leading-none">3-6kg</strong> en 2 semaines</div>
-                <div><strong className="font-display text-espresso text-2xl block leading-none">100%</strong> bio végétal</div>
-              </div>
-            </div>
+      <section className="relative flex min-h-[88vh] items-center overflow-hidden bg-espresso text-cream">
+        <HeroSlider images={settings.hero_images} />
+        <div className="absolute inset-0 bg-gradient-to-r from-espresso/92 via-espresso/78 to-espresso/55" aria-hidden />
+        <div className="relative z-10 container-page py-14 sm:py-18 lg:py-24 max-w-2xl">
+          <div className="eyebrow text-gold mb-5">{settings.hero_eyebrow}</div>
+          <h1 className="font-display text-5xl md:text-6xl lg:text-7xl leading-[1.05] mb-7">
+            <HeroTitle settings={settings} />
+          </h1>
+          <p className="text-base text-cream/85 leading-relaxed max-w-md mb-9">
+            {settings.hero_subtitle}
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <Link to={settings.cta_href as any} className="inline-flex items-center justify-center gap-2 rounded-full bg-cream px-7 py-3.5 text-xs font-medium uppercase tracking-[0.18em] text-espresso shadow-elegant transition hover:bg-gold">
+              {settings.cta_label} <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link to="/product/$slug" params={{ slug: "mass-gainer" }} className="inline-flex items-center justify-center rounded-full border border-cream/35 px-7 py-3.5 text-xs font-medium uppercase tracking-[0.18em] text-cream transition hover:bg-cream hover:text-espresso">
+              Le Mass Gainer
+            </Link>
           </div>
-          <div className="relative order-1 lg:order-2 min-h-[50vh] lg:min-h-full">
-            <img
-              src={heroImg}
-              alt="Femme rayonnante incarnant la confiance The Sisters"
-              className="absolute inset-0 w-full h-full object-cover"
-              width={1600}
-              height={1200}
-            />
+          <div className="mt-10 grid grid-cols-3 gap-4 border-t border-cream/20 pt-7 text-[11px] text-cream/70">
+            <div><strong className="font-display text-cream text-2xl block leading-none">10K+</strong> clientes</div>
+            <div><strong className="font-display text-cream text-2xl block leading-none">3-6kg</strong> en 2 sem.</div>
+            <div><strong className="font-display text-cream text-2xl block leading-none">100%</strong> bio végétal</div>
           </div>
         </div>
       </section>
@@ -89,11 +97,17 @@ function HomePage() {
             Tout voir <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          {products.map((p) => (
-            <ProductCard key={p.slug} product={p} />
-          ))}
-        </div>
+        {products.length === 0 ? (
+          <div className="rounded-sm border border-border bg-card p-12 text-center text-muted-foreground">
+            Aucun best-seller actif pour le moment.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+            {products.map((p) => (
+              <ProductCard key={p.slug} product={p} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* STORY */}
@@ -147,5 +161,57 @@ function HomePage() {
         <Link to="/products" className="btn-hero">Commencer ma transformation</Link>
       </section>
     </>
+  );
+}
+
+function HeroTitle({ settings }: { settings: SiteSettings }) {
+  const parts = settings.hero_title.split(settings.hero_highlight);
+  if (!settings.hero_highlight || parts.length === 1) return <>{settings.hero_title}</>;
+  return (
+    <>
+      {parts[0]}
+      <em className="text-gold not-italic">{settings.hero_highlight}</em>
+      {parts.slice(1).join(settings.hero_highlight)}
+    </>
+  );
+}
+
+function HeroSlider({ images }: { images: string[] }) {
+  const safeImages = images.length ? images.slice(0, 3) : [heroImg];
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    if (safeImages.length < 2) return;
+    const id = window.setInterval(() => setActive((i) => (i + 1) % safeImages.length), 4500);
+    return () => window.clearInterval(id);
+  }, [safeImages.length]);
+
+  return (
+    <div className="absolute inset-0" aria-hidden>
+      {safeImages.map((src, index) => (
+        <img
+          key={`${src}-${index}`}
+          src={src}
+          alt=""
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${
+            index === active ? "opacity-100" : "opacity-0"
+          }`}
+          width={1600}
+          height={1200}
+        />
+      ))}
+      {safeImages.length > 1 && (
+        <div className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+          {safeImages.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setActive(index)}
+              className={`h-2 rounded-full transition-all ${index === active ? "w-8 bg-gold" : "w-2 bg-cream/60"}`}
+              aria-label={`Voir l'image ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

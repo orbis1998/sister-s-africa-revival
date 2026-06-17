@@ -1,7 +1,15 @@
+import { useQuery } from "@tanstack/react-query";
+import { defaultSiteSettings, fetchSiteSettings } from "@/lib/site-settings";
+
 export function WhatsAppFloat() {
+  const { data: settings = defaultSiteSettings } = useQuery({
+    queryKey: ["site-settings-whatsapp"],
+    queryFn: fetchSiteSettings,
+  });
+
   return (
     <a
-      href="https://wa.me/243994186790"
+      href={`https://wa.me/${settings.whatsapp_number}`}
       target="_blank"
       rel="noreferrer"
       aria-label="Contacter sur WhatsApp"
