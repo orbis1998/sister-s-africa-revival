@@ -41,7 +41,7 @@ export const listOrders = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const ctx = context as any;
     const roles = await getRoles(ctx);
-    if (!roles.some((r) => ["admin", "manager", "livreur"].includes(r))) throw new Error("Forbidden");
+    if (!roles.some((r: string) => ["admin", "manager", "livreur"].includes(r))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let q = supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false });
     if (!roles.includes("admin") && !roles.includes("manager")) {
@@ -64,7 +64,7 @@ export const listDrivers = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const ctx = context as any;
     const roles = await getRoles(ctx);
-    if (!roles.some((r) => ["admin", "manager"].includes(r))) throw new Error("Forbidden");
+    if (!roles.some((r: string) => ["admin", "manager"].includes(r))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: ur } = await supabaseAdmin.from("user_roles").select("user_id").eq("role", "livreur");
     const ids = (ur ?? []).map((r: any) => r.user_id);
@@ -79,7 +79,7 @@ export const assignOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const ctx = context as any;
     const roles = await getRoles(ctx);
-    if (!roles.some((r) => ["admin", "manager"].includes(r))) throw new Error("Forbidden");
+    if (!roles.some((r: string) => ["admin", "manager"].includes(r))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("orders").update({ assigned_to: data.driver_id }).eq("id", data.order_id);
     if (error) throw new Error(error.message);
@@ -93,7 +93,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     const ctx = context as any;
     const roles = await getRoles(ctx);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    if (!roles.some((r) => ["admin", "manager"].includes(r))) {
+    if (!roles.some((r: string) => ["admin", "manager"].includes(r))) {
       // livreur: must be assigned
       const { data: o } = await supabaseAdmin.from("orders").select("assigned_to").eq("id", data.order_id).single();
       if (!o || o.assigned_to !== ctx.userId) throw new Error("Forbidden");
