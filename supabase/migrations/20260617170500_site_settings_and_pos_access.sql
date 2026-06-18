@@ -1,5 +1,5 @@
 -- Site settings editable by admins
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'pos';
+-- Requires 20260617170400_add_pos_app_role.sql to be committed first.
 
 CREATE TABLE IF NOT EXISTS public.site_settings (
   id boolean PRIMARY KEY DEFAULT true CHECK (id = true),
