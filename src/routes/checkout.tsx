@@ -20,13 +20,25 @@ const schema = z.object({
   city: z.string().min(1, "Ville requise"),
   commune: z.string().min(1, "Commune requise"),
   address: z.string().trim().min(3, "Adresse requise").max(300),
+  deliveryDate: z.string().min(1, "Jour de livraison requis"),
+  deliveryTime: z.string().min(1, "Heure de livraison requise"),
   notes: z.string().trim().max(500).optional(),
 });
+
+function tomorrowInputDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 function CheckoutPage() {
   const { items, totalFcfa, totalUsd, clear } = useCart();
   const navigate = useNavigate();
   const placeOrder = useServerFn(createOrder);
+  const minDeliveryDate = useMemo(() => tomorrowInputDate(), []);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
@@ -35,6 +47,8 @@ function CheckoutPage() {
     city: "",
     commune: "",
     address: "",
+    deliveryDate: minDeliveryDate,
+    deliveryTime: "",
     notes: "",
   });
 
@@ -56,6 +70,10 @@ function CheckoutPage() {
       toast.error(parsed.error.issues[0].message);
       return;
     }
+    if (parsed.data.deliveryDate < minDeliveryDate) {
+      toast.error("La livraison ne peut pas être programmée le jour même. Choisissez demain ou plus tard.");
+      return;
+    }
     setSubmitting(true);
 
     let orderNumber = "";
@@ -68,6 +86,8 @@ function CheckoutPage() {
         city: parsed.data.city,
         commune: parsed.data.commune,
         address: parsed.data.address,
+        delivery_date: parsed.data.deliveryDate,
+        delivery_time: parsed.data.deliveryTime,
         notes: parsed.data.notes,
         items: items.map((it) => ({
           slug: it.slug, name: it.name, variantId: it.variantId, variantLabel: it.variantLabel,
@@ -94,6 +114,7 @@ function CheckoutPage() {
     lines.push(`• Ville : ${parsed.data.city}`);
     lines.push(`• Commune : ${parsed.data.commune}`);
     lines.push(`• Adresse : ${parsed.data.address}`);
+    lines.push(`• Livraison : ${new Date(parsed.data.deliveryDate).toLocaleDateString("fr-FR")} à ${parsed.data.deliveryTime}`);
     if (parsed.data.notes) lines.push(`• Notes : ${parsed.data.notes}`);
     lines.push("");
     lines.push("*Articles*");
@@ -199,6 +220,26 @@ function CheckoutPage() {
                   required
                   maxLength={300}
                   placeholder="Avenue, n°, point de repère…"
+                  className="input"
+                />
+              </Field>
+              <Field label="Jour de livraison">
+                <input
+                  type="date"
+                  min={minDeliveryDate}
+                  value={form.deliveryDate}
+                  onChange={(e) => update("deliveryDate", e.target.value)}
+                  required
+                  className="input"
+                />
+                <span className="mt-1 block text-[11px] text-muted-foreground">Livraison à partir de demain uniquement.</span>
+              </Field>
+              <Field label="Heure souhaitée">
+                <input
+                  type="time"
+                  value={form.deliveryTime}
+                  onChange={(e) => update("deliveryTime", e.target.value)}
+                  required
                   className="input"
                 />
               </Field>

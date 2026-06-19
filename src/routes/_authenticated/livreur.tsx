@@ -17,6 +17,12 @@ const FLOW: Array<{ value: any; label: string }> = [
   { value: "delivered", label: "Livrée" },
 ];
 
+function deliveryLabel(order: any) {
+  if (!order.delivery_date && !order.delivery_time) return "Non précisée";
+  const date = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString("fr-FR") : "";
+  return [date, order.delivery_time].filter(Boolean).join(" à ");
+}
+
 function LivreurDashboard() {
   const { user } = useAuth();
   const list = useServerFn(listOrders);
@@ -57,6 +63,7 @@ function LivreurDashboard() {
                   <div>
                     <div className="font-display text-xl">{o.order_number}</div>
                     <div className="text-xs text-muted-foreground">{new Date(o.created_at).toLocaleString("fr-FR")}</div>
+                    <div className="mt-1 text-xs text-copper">Livraison : {deliveryLabel(o)}</div>
                   </div>
                   <div className="font-display text-copper">{o.total_fcfa.toLocaleString("fr-FR")} FCFA</div>
                 </div>
@@ -64,6 +71,7 @@ function LivreurDashboard() {
                   <div className="text-espresso font-medium">{o.customer_name}</div>
                   <div className="text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" />{o.customer_phone}</div>
                   <div className="text-espresso flex items-start gap-1"><MapPin className="w-3 h-3 mt-1 shrink-0" /><span>{o.address}, {o.commune}, {o.city}</span></div>
+                  <div className="text-muted-foreground">Créneau : {deliveryLabel(o)}</div>
                 </div>
                 <pre className="text-xs bg-cream/60 border border-border rounded p-2 mb-3 whitespace-pre-wrap font-sans">{itemsTxt}</pre>
                 <div className="flex gap-2 flex-wrap">

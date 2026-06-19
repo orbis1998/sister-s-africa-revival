@@ -89,39 +89,6 @@ export type Database = {
         }
         Relationships: []
       }
-      staff_expenses: {
-        Row: {
-          amount_fcfa: number
-          amount_usd: number
-          city_scope: string
-          created_at: string
-          id: string
-          note: string
-          reported_by: string
-          spent_at: string
-        }
-        Insert: {
-          amount_fcfa?: number
-          amount_usd?: number
-          city_scope: string
-          created_at?: string
-          id?: string
-          note: string
-          reported_by: string
-          spent_at?: string
-        }
-        Update: {
-          amount_fcfa?: number
-          amount_usd?: number
-          city_scope?: string
-          created_at?: string
-          id?: string
-          note?: string
-          reported_by?: string
-          spent_at?: string
-        }
-        Relationships: []
-      }
       orders: {
         Row: {
           address: string
@@ -134,6 +101,8 @@ export type Database = {
           created_at: string
           customer_name: string
           customer_phone: string
+          delivery_date: string | null
+          delivery_time: string | null
           delivered_at: string | null
           id: string
           items: Json
@@ -155,6 +124,8 @@ export type Database = {
           created_at?: string
           customer_name: string
           customer_phone: string
+          delivery_date?: string | null
+          delivery_time?: string | null
           delivered_at?: string | null
           id?: string
           items?: Json
@@ -176,6 +147,8 @@ export type Database = {
           created_at?: string
           customer_name?: string
           customer_phone?: string
+          delivery_date?: string | null
+          delivery_time?: string | null
           delivered_at?: string | null
           id?: string
           items?: Json

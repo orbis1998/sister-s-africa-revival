@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Plus, ShoppingCart } from "lucide-react";
+import { Loader2, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_authenticated/pos")({
 function PosDashboard() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [sale, setSale] = useState<any>({ customer_name: "", customer_phone: "", product_id: "", qty: 1, payment_method: "cash" });
+  const [sale, setSale] = useState<any>({ customer_name: "", customer_phone: "", product_id: "", qty: 1, payment_method: "cash", items: [] });
 
   const assignment = useQuery({
     queryKey: ["pos-assignment", user?.id],
@@ -47,8 +47,8 @@ function PosDashboard() {
   });
 
   const selectedProduct = products.data?.find((p: any) => p.id === sale.product_id);
-  const totalFcfa = selectedProduct ? Number(selectedProduct.price_fcfa) * Number(sale.qty || 1) : 0;
-  const totalUsd = selectedProduct ? Number(selectedProduct.price_usd) * Number(sale.qty || 1) : 0;
+  const totalFcfa = sale.items.reduce((sum: number, item: any) => sum + Number(item.price_fcfa ?? 0) * Number(item.qty ?? 1), 0);
+  const totalUsd = sale.items.reduce((sum: number, item: any) => sum + Number(item.price_usd ?? 0) * Number(item.qty ?? 1), 0);
 
   const todaySales = useMemo(() => {
     const today = new Date().toDateString();
@@ -58,7 +58,7 @@ function PosDashboard() {
 
   const createSale = useMutation({
     mutationFn: async () => {
-      if (!user || !assignment.data?.pos_id || !selectedProduct) throw new Error("Vente incomplète");
+      if (!user || !assignment.data?.pos_id || sale.items.length === 0) throw new Error("Vente incomplète");
       const payload = {
         pos_id: assignment.data.pos_id,
         sold_by: user.id,
@@ -67,21 +67,14 @@ function PosDashboard() {
         payment_method: sale.payment_method,
         total_fcfa: totalFcfa,
         total_usd: totalUsd,
-        items: [{
-          product_id: selectedProduct.id,
-          slug: selectedProduct.slug,
-          name: selectedProduct.name,
-          qty: Number(sale.qty || 1),
-          price_fcfa: Number(selectedProduct.price_fcfa),
-          price_usd: Number(selectedProduct.price_usd),
-        }],
+        items: sale.items,
       };
       const { error } = await supabase.from("pos_sales").insert(payload);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Vente enregistrée");
-      setSale({ customer_name: "", customer_phone: "", product_id: "", qty: 1, payment_method: "cash" });
+      setSale({ customer_name: "", customer_phone: "", product_id: "", qty: 1, payment_method: "cash", items: [] });
       qc.invalidateQueries({ queryKey: ["pos-sales", assignment.data?.pos_id] });
     },
     onError: (e: any) => toast.error(e.message),
@@ -118,6 +111,44 @@ function PosDashboard() {
                   {(products.data ?? []).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 <input type="number" min={1} value={sale.qty} onChange={(e) => setSale({ ...sale, qty: parseInt(e.target.value) || 1 })} className="input-admin" />
+                <button
+                  type="button"
+                  disabled={!selectedProduct}
+                  onClick={() => {
+                    if (!selectedProduct) return;
+                    const item = {
+                      product_id: selectedProduct.id,
+                      slug: selectedProduct.slug,
+                      name: selectedProduct.name,
+                      qty: Number(sale.qty || 1),
+                      price_fcfa: Number(selectedProduct.price_fcfa),
+                      price_usd: Number(selectedProduct.price_usd),
+                    };
+                    const existingIndex = sale.items.findIndex((current: any) => current.product_id === item.product_id);
+                    const nextItems = existingIndex >= 0
+                      ? sale.items.map((current: any, index: number) => index === existingIndex ? { ...current, qty: current.qty + item.qty } : current)
+                      : [...sale.items, item];
+                    setSale({ ...sale, product_id: "", qty: 1, items: nextItems });
+                  }}
+                  className="rounded bg-espresso px-4 py-2 text-xs font-medium uppercase tracking-widest text-cream disabled:opacity-50"
+                >
+                  Ajouter le produit
+                </button>
+                <div className="space-y-2">
+                  {sale.items.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Aucun produit ajouté.</p>
+                  ) : sale.items.map((item: any) => (
+                    <div key={item.product_id} className="flex items-center justify-between gap-3 rounded-xl bg-cream/70 p-3 text-sm">
+                      <div>
+                        <strong>{item.qty} × {item.name}</strong>
+                        <div className="text-xs text-muted-foreground">{(item.price_fcfa * item.qty).toLocaleString("fr-FR")} FCFA · ${item.price_usd * item.qty}</div>
+                      </div>
+                      <button type="button" onClick={() => setSale({ ...sale, items: sale.items.filter((current: any) => current.product_id !== item.product_id) })} className="rounded-full p-2 text-red-600 hover:bg-red-50">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
                 <select value={sale.payment_method} onChange={(e) => setSale({ ...sale, payment_method: e.target.value })} className="input-admin">
                   <option value="cash">Cash</option>
                   <option value="mobile_money">Mobile Money</option>
@@ -126,7 +157,7 @@ function PosDashboard() {
                 <div className="rounded-xl bg-clay p-4 text-sm">
                   Total : <strong>{totalFcfa.toLocaleString("fr-FR")} FCFA</strong> · ${totalUsd}
                 </div>
-                <button onClick={() => createSale.mutate()} disabled={createSale.isPending || !selectedProduct} className="btn-hero w-full disabled:opacity-50">
+                <button onClick={() => createSale.mutate()} disabled={createSale.isPending || sale.items.length === 0} className="btn-hero w-full disabled:opacity-50">
                   {createSale.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Enregistrement</> : <><Plus className="w-4 h-4" /> Enregistrer la vente</>}
                 </button>
               </div>

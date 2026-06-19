@@ -7,7 +7,9 @@ ALTER TABLE public.profiles
 ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS city_scope text CHECK (
     city_scope IS NULL OR city_scope IN ('kinshasa', 'katanga', 'brazzaville', 'pointe-noire')
-  );
+  ),
+  ADD COLUMN IF NOT EXISTS delivery_date date,
+  ADD COLUMN IF NOT EXISTS delivery_time time;
 
 UPDATE public.orders
 SET city_scope = CASE

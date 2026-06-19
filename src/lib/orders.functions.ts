@@ -18,11 +18,22 @@ async function getProfileScope(supabaseAdmin: any, userId: string) {
   return data?.city_scope ?? null;
 }
 
+async function ensureManagerOrderAccess(supabaseAdmin: any, roles: string[], userId: string) {
+  if (!roles.includes("manager") || roles.includes("admin")) return;
+  const { data } = await supabaseAdmin
+    .from("manager_permissions")
+    .select("can_manage_orders, can_manage_logistics")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!data?.can_manage_orders && !data?.can_manage_logistics) throw new Error("Forbidden: accès commandes non autorisé");
+}
+
 export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((d: {
     customer_name: string; customer_phone: string;
     country_code: string; country_name: string;
     city: string; commune: string; address: string;
+    delivery_date?: string; delivery_time?: string;
     notes?: string;
     items: Array<{ slug: string; name: string; variantId: string; variantLabel: string; qty: number; priceUsd: number; priceFcfa: number }>;
     total_fcfa: number; total_usd: number;
@@ -39,6 +50,8 @@ export const createOrder = createServerFn({ method: "POST" })
       city_scope,
       commune: data.commune,
       address: data.address,
+      delivery_date: data.delivery_date ?? null,
+      delivery_time: data.delivery_time ?? null,
       notes: data.notes ?? null,
       items: data.items,
       total_fcfa: data.total_fcfa,
@@ -54,6 +67,7 @@ export const createStaffOrder = createServerFn({ method: "POST" })
     customer_name: string; customer_phone: string;
     country_code: string; country_name: string;
     city: string; commune: string; address: string;
+    delivery_date?: string; delivery_time?: string;
     notes?: string; assigned_to?: string | null;
     items?: Array<{ slug?: string; name: string; variantId?: string; variantLabel?: string; qty: number; priceUsd?: number; priceFcfa?: number }>;
     total_fcfa: number; total_usd: number;
@@ -63,6 +77,7 @@ export const createStaffOrder = createServerFn({ method: "POST" })
     const roles = await getRoles(ctx);
     if (!roles.some((r: string) => ["admin", "manager"].includes(r))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await ensureManagerOrderAccess(supabaseAdmin, roles, ctx.userId);
     const city_scope = directionFromCity(data.city, data.country_code);
 
     if (!roles.includes("admin")) {
@@ -83,6 +98,8 @@ export const createStaffOrder = createServerFn({ method: "POST" })
       city_scope,
       commune: data.commune,
       address: data.address,
+      delivery_date: data.delivery_date ?? null,
+      delivery_time: data.delivery_time ?? null,
       notes: data.notes ?? null,
       assigned_to: data.assigned_to || null,
       items: data.items?.length ? data.items : [{ name: "Commande manuelle", qty: 1 }],
@@ -100,6 +117,7 @@ export const listOrders = createServerFn({ method: "GET" })
     const roles = await getRoles(ctx);
     if (!roles.some((r: string) => ["admin", "manager", "livreur"].includes(r))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await ensureManagerOrderAccess(supabaseAdmin, roles, ctx.userId);
     let q = supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false });
     if (!roles.includes("admin") && roles.includes("manager")) {
       const scope = await getProfileScope(supabaseAdmin, ctx.userId);
@@ -126,6 +144,7 @@ export const listDrivers = createServerFn({ method: "GET" })
     const roles = await getRoles(ctx);
     if (!roles.some((r: string) => ["admin", "manager"].includes(r))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await ensureManagerOrderAccess(supabaseAdmin, roles, ctx.userId);
     const { data: ur } = await supabaseAdmin.from("user_roles").select("user_id").eq("role", "livreur");
     const ids = (ur ?? []).map((r: any) => r.user_id);
     if (!ids.length) return [];
@@ -146,6 +165,7 @@ export const assignOrder = createServerFn({ method: "POST" })
     const roles = await getRoles(ctx);
     if (!roles.some((r: string) => ["admin", "manager"].includes(r))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await ensureManagerOrderAccess(supabaseAdmin, roles, ctx.userId);
     if (!roles.includes("admin")) {
       const scope = await getProfileScope(supabaseAdmin, ctx.userId);
       const { data: order } = await supabaseAdmin.from("orders").select("city_scope").eq("id", data.order_id).maybeSingle();
@@ -167,6 +187,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     const ctx = context as any;
     const roles = await getRoles(ctx);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await ensureManagerOrderAccess(supabaseAdmin, roles, ctx.userId);
     if (roles.includes("manager") && !roles.includes("admin")) {
       const scope = await getProfileScope(supabaseAdmin, ctx.userId);
       const { data: o } = await supabaseAdmin.from("orders").select("city_scope").eq("id", data.order_id).single();
