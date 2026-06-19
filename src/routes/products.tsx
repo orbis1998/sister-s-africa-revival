@@ -29,7 +29,7 @@ function ProductsPage() {
     <section className="container-page py-20">
       <div className="text-center max-w-2xl mx-auto mb-16">
         <div className="eyebrow mb-3">Produits</div>
-        <h1 className="font-display text-5xl md:text-6xl text-espresso mb-6">La collection</h1>
+        <h1 className="font-display text-5xl md:text-6xl text-espresso mb-6">Nos produits</h1>
         <p className="text-muted-foreground">
           Trois formules, une seule promesse&nbsp;: vous accompagner vers la version la plus
           confiante et rayonnante de vous-même.

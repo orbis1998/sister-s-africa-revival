@@ -106,7 +106,8 @@ function CheckoutPage() {
     lines.push(`*Total : ${totalFcfa.toLocaleString("fr-FR")} FCFA · $${totalUsd}*`);
 
     const message = encodeURIComponent(lines.join("\n"));
-    const url = `https://wa.me/${country.whatsapp}?text=${message}`;
+    const whatsappNumber = cityObj?.whatsapp ?? country.whatsapp;
+    const url = `https://wa.me/${whatsappNumber}?text=${message}`;
 
     toast.success("Commande enregistrée — redirection WhatsApp…");
     setTimeout(() => {
@@ -235,7 +236,7 @@ function CheckoutPage() {
             {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Redirection…</> : <><MessageCircle className="w-4 h-4" /> Commander par WhatsApp</>}
           </button>
           <p className="text-[11px] text-muted-foreground text-center mt-4">
-            Vous serez mis(e) en relation avec notre équipe via <strong>{country.whatsappDisplay}</strong> pour confirmer et payer à la livraison.
+            Vous serez mis(e) en relation avec notre équipe via <strong>{cityObj?.whatsappDisplay ?? country.whatsappDisplay}</strong> pour confirmer et payer à la livraison.
           </p>
         </aside>
       </form>

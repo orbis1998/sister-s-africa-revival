@@ -3,7 +3,8 @@ import heroImg from "@/assets/hero.jpg";
 import { fetchFeaturedProducts } from "@/lib/products";
 import { defaultSiteSettings, fetchSiteSettings, type SiteSettings } from "@/lib/site-settings";
 import { ProductCard } from "@/components/site/ProductCard";
-import { ArrowRight, Leaf, ShieldCheck, Truck, HeartHandshake } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { ArrowRight, Leaf, ShieldCheck, Truck, HeartHandshake, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/")({
@@ -56,9 +57,6 @@ function HomePage() {
           <div className="flex flex-wrap gap-4">
             <Link to={settings.cta_href as any} className="inline-flex items-center justify-center gap-2 rounded-full bg-cream px-7 py-3.5 text-xs font-medium uppercase tracking-[0.18em] text-espresso shadow-elegant transition hover:bg-gold">
               {settings.cta_label} <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link to="/product/$slug" params={{ slug: "mass-gainer" }} className="inline-flex items-center justify-center rounded-full border border-cream/35 px-7 py-3.5 text-xs font-medium uppercase tracking-[0.18em] text-cream transition hover:bg-cream hover:text-espresso">
-              Le Mass Gainer
             </Link>
           </div>
           <div className="mt-10 grid grid-cols-3 gap-4 border-t border-cream/20 pt-7 text-[11px] text-cream/70">
@@ -129,25 +127,30 @@ function HomePage() {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-copper/20 p-8 rounded-sm">
-              <div className="font-display text-5xl text-gold mb-2">+10K</div>
-              <div className="text-xs uppercase tracking-widest text-cream/70">Clientes</div>
-            </div>
-            <div className="bg-copper/20 p-8 rounded-sm mt-12">
-              <div className="font-display text-5xl text-gold mb-2">4</div>
-              <div className="text-xs uppercase tracking-widest text-cream/70">Pays livrés</div>
-            </div>
-            <div className="bg-copper/20 p-8 rounded-sm">
-              <div className="font-display text-5xl text-gold mb-2">100%</div>
-              <div className="text-xs uppercase tracking-widest text-cream/70">Origine végétale</div>
-            </div>
-            <div className="bg-copper/20 p-8 rounded-sm mt-12">
-              <div className="font-display text-5xl text-gold mb-2">2 sem.</div>
-              <div className="text-xs uppercase tracking-widest text-cream/70">Premiers résultats</div>
-            </div>
+            {[
+              { value: "+10K", label: "Clientes accompagnées" },
+              { value: "4", label: "Pays livrés" },
+              { value: "100%", label: "Origine végétale" },
+              { value: "2 sem.", label: "Premiers résultats" },
+            ].map((item, index) => (
+              <div
+                key={item.label}
+                className={`group relative overflow-hidden rounded-3xl border border-cream/10 bg-cream/[0.06] p-6 shadow-elegant backdrop-blur transition hover:-translate-y-1 hover:bg-cream/[0.1] sm:p-8 ${
+                  index % 2 === 1 ? "mt-10" : ""
+                }`}
+              >
+                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gold/15 blur-2xl transition group-hover:bg-gold/25" />
+                <div className="relative">
+                  <div className="font-display text-4xl text-gold mb-3 sm:text-5xl">{item.value}</div>
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-cream/70">{item.label}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
+
+      <HomeReviews />
 
       {/* CTA */}
       <section className="container-page py-24 text-center">
@@ -161,6 +164,55 @@ function HomePage() {
         <Link to="/products" className="btn-hero">Commencer ma transformation</Link>
       </section>
     </>
+  );
+}
+
+function HomeReviews() {
+  const [reviews, setReviews] = useState<any[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("reviews")
+      .select("id, author_name, rating, comment, location")
+      .eq("approved", true)
+      .order("created_at", { ascending: false })
+      .limit(8)
+      .then(({ data }) => {
+        if (!cancelled) setReviews(data ?? []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (reviews.length === 0) return null;
+
+  return (
+    <section className="bg-clay/30 py-20">
+      <div className="container-page">
+        <div className="mb-10 text-center">
+          <div className="eyebrow mb-3">Avis clientes</div>
+          <h2 className="font-display text-4xl text-espresso md:text-5xl">Elles nous font confiance</h2>
+        </div>
+        <div className="flex gap-5 overflow-x-auto pb-3 snap-x">
+          {reviews.map((review) => (
+            <article key={review.id} className="min-w-[280px] snap-start rounded-3xl border border-border bg-card p-6 shadow-sm sm:min-w-[360px]">
+              <div className="mb-4 flex gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <Star key={n} className={`h-4 w-4 ${n <= review.rating ? "fill-gold text-gold" : "text-border"}`} />
+                ))}
+              </div>
+              <p className="text-sm leading-relaxed text-espresso/80 italic">"{review.comment}"</p>
+              <div className="mt-5 flex items-center justify-between text-xs">
+                <span className="font-medium text-espresso">{review.author_name}</span>
+                {review.location && <span className="text-muted-foreground">{review.location}</span>}
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 

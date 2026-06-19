@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { adminCreateUser, adminListUsers, adminDeleteUser } from "@/lib/admin.functions";
+import { directionLabel, STAFF_DIRECTIONS } from "@/lib/staff-scope";
 import { Trash2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -35,7 +36,7 @@ function UsersPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<any>({
     email: "", password: "", full_name: "", phone: "", badge_id: "",
-    role: "livreur", permissions: {}, pos_id: "",
+    role: "livreur", city_scope: "kinshasa", permissions: {}, pos_id: "",
   });
 
   const createMut = useMutation({
@@ -62,16 +63,17 @@ function UsersPage() {
         <table className="w-full text-sm">
           <thead className="bg-clay/50">
             <tr className="text-left text-xs uppercase tracking-widest">
-                  <th className="p-3">Email</th><th className="p-3">Nom</th><th className="p-3">Badge</th><th className="p-3">Rôles</th><th className="p-3">POS</th><th></th>
+                  <th className="p-3">Email</th><th className="p-3">Nom</th><th className="p-3">Badge</th><th className="p-3">Direction</th><th className="p-3">Rôles</th><th className="p-3">POS</th><th></th>
             </tr>
           </thead>
           <tbody>
-            {isLoading ? <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Chargement…</td></tr> :
+            {isLoading ? <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Chargement…</td></tr> :
               users.map((u: any) => (
                 <tr key={u.id} className="border-t border-border">
                   <td className="p-3">{u.email}</td>
                   <td className="p-3">{u.profile?.full_name ?? "—"}</td>
                   <td className="p-3">{u.profile?.badge_id ?? "—"}</td>
+                  <td className="p-3 text-xs text-muted-foreground">{directionLabel(u.profile?.city_scope)}</td>
                   <td className="p-3">
                     {u.roles.map((r: string) => (
                       <span key={r} className="inline-block px-2 py-0.5 rounded bg-copper/15 text-copper text-xs mr-1">{r}</span>
@@ -105,6 +107,13 @@ function UsersPage() {
                 <option value="livreur">Livreur</option>
                 <option value="pos">Point de vente</option>
               </select>
+              {form.role !== "admin" && (
+                <select value={form.city_scope} onChange={(e) => setForm({ ...form, city_scope: e.target.value })} className="col-span-2 px-3 py-2 border border-border rounded bg-background">
+                  {STAFF_DIRECTIONS.map((direction) => (
+                    <option key={direction.value} value={direction.value}>{direction.label}</option>
+                  ))}
+                </select>
+              )}
             </div>
             {form.role === "pos" && (
               <div className="mt-4">

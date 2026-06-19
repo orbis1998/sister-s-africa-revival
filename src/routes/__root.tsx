@@ -104,6 +104,7 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const hideSiteChrome = /^\/(admin|manager|livreur|account|pos)(\/|$)/.test(pathname);
   // Scroll to top on navigation
   useEffect(() => {
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
@@ -114,13 +115,13 @@ function RootComponent() {
       <AuthProvider>
         <CartProvider>
           <div className="min-h-screen flex flex-col">
-            <Header />
+            {!hideSiteChrome && <Header />}
             <main className="flex-1">
               <Outlet />
             </main>
-            <Footer />
+            {!hideSiteChrome && <Footer />}
           </div>
-          <WhatsAppFloat />
+          {!hideSiteChrome && <WhatsAppFloat />}
           <Toaster position="top-center" richColors />
         </CartProvider>
       </AuthProvider>

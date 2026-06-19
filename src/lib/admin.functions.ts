@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { StaffDirection } from "@/lib/staff-scope";
 
 type Role = "admin" | "manager" | "livreur" | "pos";
 
@@ -12,7 +13,7 @@ export const adminCreateUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
     email: string; password: string; full_name: string; phone?: string;
-    badge_id?: string; role: Role; permissions?: Record<string, boolean>; pos_ids?: string[]; pos_id?: string;
+    badge_id?: string; role: Role; city_scope?: StaffDirection | ""; permissions?: Record<string, boolean>; pos_ids?: string[]; pos_id?: string;
   }) => d)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as any);
@@ -27,7 +28,11 @@ export const adminCreateUser = createServerFn({ method: "POST" })
     const uid = created.user.id;
     // Profile (upsert; trigger may have created it)
     await supabaseAdmin.from("profiles").upsert({
-      id: uid, full_name: data.full_name, phone: data.phone, badge_id: data.badge_id ?? null,
+      id: uid,
+      full_name: data.full_name,
+      phone: data.phone,
+      badge_id: data.badge_id?.trim() || null,
+      city_scope: data.city_scope || null,
     });
     // Remove default 'client' role assigned by trigger, then add target role
     await supabaseAdmin.from("user_roles").delete().eq("user_id", uid);

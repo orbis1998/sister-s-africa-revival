@@ -1,11 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { directionFromCity } from "@/lib/staff-scope";
 
 type Status = "received" | "preparing" | "ready" | "en_route" | "delivered" | "cancelled";
 
 async function getRoles(ctx: { supabase: any; userId: string }) {
   const { data } = await ctx.supabase.from("user_roles").select("role").eq("user_id", ctx.userId);
   return (data ?? []).map((r: any) => r.role as string);
+}
+
+async function getProfileScope(supabaseAdmin: any, userId: string) {
+  const { data } = await supabaseAdmin
+    .from("profiles")
+    .select("city_scope")
+    .eq("id", userId)
+    .maybeSingle();
+  return data?.city_scope ?? null;
 }
 
 export const createOrder = createServerFn({ method: "POST" })
@@ -19,16 +29,63 @@ export const createOrder = createServerFn({ method: "POST" })
   }) => d)
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const city_scope = directionFromCity(data.city, data.country_code);
     const { data: row, error } = await supabaseAdmin.from("orders").insert({
       customer_name: data.customer_name,
       customer_phone: data.customer_phone,
       country_code: data.country_code,
       country_name: data.country_name,
       city: data.city,
+      city_scope,
       commune: data.commune,
       address: data.address,
       notes: data.notes ?? null,
       items: data.items,
+      total_fcfa: data.total_fcfa,
+      total_usd: data.total_usd,
+    }).select("order_number, id").single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
+export const createStaffOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    customer_name: string; customer_phone: string;
+    country_code: string; country_name: string;
+    city: string; commune: string; address: string;
+    notes?: string; assigned_to?: string | null;
+    items?: Array<{ slug?: string; name: string; variantId?: string; variantLabel?: string; qty: number; priceUsd?: number; priceFcfa?: number }>;
+    total_fcfa: number; total_usd: number;
+  }) => d)
+  .handler(async ({ data, context }) => {
+    const ctx = context as any;
+    const roles = await getRoles(ctx);
+    if (!roles.some((r: string) => ["admin", "manager"].includes(r))) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const city_scope = directionFromCity(data.city, data.country_code);
+
+    if (!roles.includes("admin")) {
+      const scope = await getProfileScope(supabaseAdmin, ctx.userId);
+      if (!scope || city_scope !== scope) throw new Error("Forbidden: commande hors direction");
+      if (data.assigned_to) {
+        const { data: driver } = await supabaseAdmin.from("profiles").select("city_scope").eq("id", data.assigned_to).maybeSingle();
+        if (driver?.city_scope !== scope) throw new Error("Forbidden: livreur hors direction");
+      }
+    }
+
+    const { data: row, error } = await supabaseAdmin.from("orders").insert({
+      customer_name: data.customer_name,
+      customer_phone: data.customer_phone,
+      country_code: data.country_code,
+      country_name: data.country_name,
+      city: data.city,
+      city_scope,
+      commune: data.commune,
+      address: data.address,
+      notes: data.notes ?? null,
+      assigned_to: data.assigned_to || null,
+      items: data.items?.length ? data.items : [{ name: "Commande manuelle", qty: 1 }],
       total_fcfa: data.total_fcfa,
       total_usd: data.total_usd,
     }).select("order_number, id").single();
@@ -44,7 +101,10 @@ export const listOrders = createServerFn({ method: "GET" })
     if (!roles.some((r: string) => ["admin", "manager", "livreur"].includes(r))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let q = supabaseAdmin.from("orders").select("*").order("created_at", { ascending: false });
-    if (!roles.includes("admin") && !roles.includes("manager")) {
+    if (!roles.includes("admin") && roles.includes("manager")) {
+      const scope = await getProfileScope(supabaseAdmin, ctx.userId);
+      q = scope ? q.eq("city_scope", scope) : q.eq("id", "00000000-0000-0000-0000-000000000000");
+    } else if (!roles.includes("admin")) {
       q = q.eq("assigned_to", ctx.userId);
     }
     const { data, error } = await q;
@@ -69,7 +129,12 @@ export const listDrivers = createServerFn({ method: "GET" })
     const { data: ur } = await supabaseAdmin.from("user_roles").select("user_id").eq("role", "livreur");
     const ids = (ur ?? []).map((r: any) => r.user_id);
     if (!ids.length) return [];
-    const { data: profs } = await supabaseAdmin.from("profiles").select("id, full_name, phone, badge_id").in("id", ids);
+    let q = supabaseAdmin.from("profiles").select("id, full_name, phone, badge_id, city_scope").in("id", ids);
+    if (!roles.includes("admin")) {
+      const scope = await getProfileScope(supabaseAdmin, ctx.userId);
+      q = scope ? q.eq("city_scope", scope) : q.eq("id", "00000000-0000-0000-0000-000000000000");
+    }
+    const { data: profs } = await q;
     return profs ?? [];
   });
 
@@ -81,6 +146,15 @@ export const assignOrder = createServerFn({ method: "POST" })
     const roles = await getRoles(ctx);
     if (!roles.some((r: string) => ["admin", "manager"].includes(r))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (!roles.includes("admin")) {
+      const scope = await getProfileScope(supabaseAdmin, ctx.userId);
+      const { data: order } = await supabaseAdmin.from("orders").select("city_scope").eq("id", data.order_id).maybeSingle();
+      if (!scope || order?.city_scope !== scope) throw new Error("Forbidden: commande hors direction");
+      if (data.driver_id) {
+        const { data: driver } = await supabaseAdmin.from("profiles").select("city_scope").eq("id", data.driver_id).maybeSingle();
+        if (driver?.city_scope !== scope) throw new Error("Forbidden: livreur hors direction");
+      }
+    }
     const { error } = await supabaseAdmin.from("orders").update({ assigned_to: data.driver_id }).eq("id", data.order_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -93,7 +167,11 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     const ctx = context as any;
     const roles = await getRoles(ctx);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    if (!roles.some((r: string) => ["admin", "manager"].includes(r))) {
+    if (roles.includes("manager") && !roles.includes("admin")) {
+      const scope = await getProfileScope(supabaseAdmin, ctx.userId);
+      const { data: o } = await supabaseAdmin.from("orders").select("city_scope").eq("id", data.order_id).single();
+      if (!scope || o?.city_scope !== scope) throw new Error("Forbidden");
+    } else if (!roles.some((r: string) => ["admin", "manager"].includes(r))) {
       // livreur: must be assigned
       const { data: o } = await supabaseAdmin.from("orders").select("assigned_to").eq("id", data.order_id).single();
       if (!o || o.assigned_to !== ctx.userId) throw new Error("Forbidden");

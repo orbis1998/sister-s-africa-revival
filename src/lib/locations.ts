@@ -1,6 +1,8 @@
 export interface City {
   name: string;
   communes: string[];
+  whatsapp?: string;
+  whatsappDisplay?: string;
 }
 
 export interface Country {
@@ -22,6 +24,8 @@ export const countries: Country[] = [
     cities: [
       {
         name: "Kinshasa",
+        whatsapp: "243994186790",
+        whatsappDisplay: "+243 994 186 790",
         communes: [
           "Gombe",
           "Kintambo",
@@ -50,10 +54,12 @@ export const countries: Country[] = [
       },
       {
         name: "Lubumbashi",
+        whatsapp: "243994186790",
+        whatsappDisplay: "+243 994 186 790",
         communes: ["Lubumbashi", "Kampemba", "Kenya", "Katuba", "Rwashi", "Annexe"],
       },
-      { name: "Kolwezi", communes: ["Manika", "Dilala"] },
-      { name: "Likasi", communes: ["Likasi", "Panda", "Shituru"] },
+      { name: "Kolwezi", whatsapp: "243994186790", whatsappDisplay: "+243 994 186 790", communes: ["Manika", "Dilala"] },
+      { name: "Likasi", whatsapp: "243994186790", whatsappDisplay: "+243 994 186 790", communes: ["Likasi", "Panda", "Shituru"] },
       { name: "Matadi", communes: ["Matadi", "Nzanza", "Mvuzi"] },
     ],
   },
@@ -66,6 +72,8 @@ export const countries: Country[] = [
     cities: [
       {
         name: "Brazzaville",
+        whatsapp: "242065313192",
+        whatsappDisplay: "+242 06 531 3192",
         communes: [
           "Bacongo",
           "Makélékélé",
@@ -80,6 +88,8 @@ export const countries: Country[] = [
       },
       {
         name: "Pointe-Noire",
+        whatsapp: "242065313192",
+        whatsappDisplay: "+242 06 531 3192",
         communes: ["Lumumba", "Mvou-Mvou", "Tié-Tié", "Loandjili", "Mongo-Mpoukou", "Ngoyo"],
       },
     ],

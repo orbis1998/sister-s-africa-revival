@@ -16,9 +16,9 @@ const empty = {
   slug: "",
   name: "",
   description: "",
-  price_usd: 0,
-  price_fcfa: 0,
-  quantity: 0,
+  price_usd: "",
+  price_fcfa: "",
+  quantity: "",
   image_url: "",
   imageFile: null as File | null,
   is_active: true,
@@ -55,6 +55,9 @@ function ProductsPage() {
   const save = useMutation({
     mutationFn: async (data: any) => {
       const { imageFile, ...payload } = data;
+      payload.price_usd = Number(payload.price_usd || 0);
+      payload.price_fcfa = Number.parseInt(payload.price_fcfa || "0", 10);
+      payload.quantity = Number.parseInt(payload.quantity || "0", 10);
       if (imageFile) {
         payload.image_url = await uploadProductImage(imageFile);
       }
@@ -121,13 +124,13 @@ function ProductsPage() {
                 <textarea value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-admin resize-none" rows={3} />
               </Field>
               <Field label="Prix (USD)">
-                <input type="number" step="0.01" min={0} value={form.price_usd} onChange={(e) => setForm({ ...form, price_usd: parseFloat(e.target.value) || 0 })} className="input-admin" />
+                <input type="number" step="0.01" min={0} value={form.price_usd || ""} onChange={(e) => setForm({ ...form, price_usd: e.target.value })} className="input-admin" />
               </Field>
               <Field label="Prix (FCFA)">
-                <input type="number" min={0} value={form.price_fcfa} onChange={(e) => setForm({ ...form, price_fcfa: parseInt(e.target.value) || 0 })} className="input-admin" />
+                <input type="number" min={0} value={form.price_fcfa || ""} onChange={(e) => setForm({ ...form, price_fcfa: e.target.value })} className="input-admin" />
               </Field>
               <Field label="Stock disponible" className="col-span-2">
-                <input type="number" min={0} value={form.quantity ?? 0} onChange={(e) => setForm({ ...form, quantity: parseInt(e.target.value) || 0 })} className="input-admin" />
+                <input type="number" min={0} value={form.quantity || ""} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="input-admin" />
                 <p className="mt-1.5 text-xs text-muted-foreground">Nombre d'unités en stock pour la vente en ligne.</p>
               </Field>
               <Field label="Image du produit" className="col-span-2">

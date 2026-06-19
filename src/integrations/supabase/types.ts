@@ -56,11 +56,78 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_expenses: {
+        Row: {
+          amount_fcfa: number
+          amount_usd: number
+          city_scope: string
+          created_at: string
+          id: string
+          note: string
+          reported_by: string
+          spent_at: string
+        }
+        Insert: {
+          amount_fcfa?: number
+          amount_usd?: number
+          city_scope: string
+          created_at?: string
+          id?: string
+          note: string
+          reported_by: string
+          spent_at?: string
+        }
+        Update: {
+          amount_fcfa?: number
+          amount_usd?: number
+          city_scope?: string
+          created_at?: string
+          id?: string
+          note?: string
+          reported_by?: string
+          spent_at?: string
+        }
+        Relationships: []
+      }
+      staff_expenses: {
+        Row: {
+          amount_fcfa: number
+          amount_usd: number
+          city_scope: string
+          created_at: string
+          id: string
+          note: string
+          reported_by: string
+          spent_at: string
+        }
+        Insert: {
+          amount_fcfa?: number
+          amount_usd?: number
+          city_scope: string
+          created_at?: string
+          id?: string
+          note: string
+          reported_by: string
+          spent_at?: string
+        }
+        Update: {
+          amount_fcfa?: number
+          amount_usd?: number
+          city_scope?: string
+          created_at?: string
+          id?: string
+          note?: string
+          reported_by?: string
+          spent_at?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           address: string
           assigned_to: string | null
           city: string
+          city_scope: string | null
           commune: string
           country_code: string
           country_name: string
@@ -81,6 +148,7 @@ export type Database = {
           address: string
           assigned_to?: string | null
           city: string
+          city_scope?: string | null
           commune: string
           country_code: string
           country_name: string
@@ -101,6 +169,7 @@ export type Database = {
           address?: string
           assigned_to?: string | null
           city?: string
+          city_scope?: string | null
           commune?: string
           country_code?: string
           country_name?: string
@@ -251,6 +320,7 @@ export type Database = {
       profiles: {
         Row: {
           badge_id: string | null
+          city_scope: string | null
           created_at: string
           full_name: string | null
           id: string
@@ -259,6 +329,7 @@ export type Database = {
         }
         Insert: {
           badge_id?: string | null
+          city_scope?: string | null
           created_at?: string
           full_name?: string | null
           id: string
@@ -267,6 +338,7 @@ export type Database = {
         }
         Update: {
           badge_id?: string | null
+          city_scope?: string | null
           created_at?: string
           full_name?: string | null
           id?: string

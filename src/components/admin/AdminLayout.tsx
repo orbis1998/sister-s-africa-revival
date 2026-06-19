@@ -19,20 +19,25 @@ const adminLinks: NavLink[] = [
 
 export function StaffShell({
   children, title, requiredRole,
-}: { children: ReactNode; title: string; requiredRole: AppRole }) {
+}: { children: ReactNode; title: string; requiredRole: AppRole | AppRole[] }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { roles, loading, signOut, user } = useAuth();
   const navigate = useNavigate();
+  const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+  const primaryRole = roles.includes("admin") && allowedRoles.includes("admin") ? "admin" : allowedRoles[0];
 
   useEffect(() => {
-    if (!loading && user && !roles.includes(requiredRole)) {
+    if (!loading && user && !allowedRoles.some((role) => roles.includes(role))) {
       navigate({ to: "/auth" });
     }
-  }, [loading, roles, user, requiredRole, navigate]);
+  }, [loading, roles, user, allowedRoles, navigate]);
 
-  const links: NavLink[] = requiredRole === "admin" ? adminLinks
-    : requiredRole === "manager" ? [{ to: "/manager", label: "Manager", icon: Briefcase, exact: true }]
-    : requiredRole === "pos" ? [{ to: "/pos", label: "POS", icon: ShoppingCart, exact: true }]
+  const links: NavLink[] = primaryRole === "admin" ? adminLinks
+    : primaryRole === "manager" ? [
+      { to: "/manager", label: "Manager", icon: Briefcase, exact: true },
+      { to: "/admin/logistics", label: "Commandes", icon: ClipboardList },
+    ]
+    : primaryRole === "pos" ? [{ to: "/pos", label: "POS", icon: ShoppingCart, exact: true }]
     : [{ to: "/livreur", label: "Livreur", icon: Truck, exact: true }];
 
   return (
