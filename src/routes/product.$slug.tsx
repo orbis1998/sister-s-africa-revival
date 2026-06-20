@@ -2,8 +2,8 @@ import { createFileRoute, notFound, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { fetchProductBySlug, formatPrice, type Product } from "@/lib/products";
 import { useCart } from "@/lib/cart";
-import { Reviews } from "@/components/site/Reviews";
 import { ReviewForm } from "@/components/site/ReviewForm";
+import { Reviews } from "@/components/site/Reviews";
 import { ShoppingBag, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,7 +32,7 @@ function ProductPage() {
   const { product } = Route.useLoaderData() as { product: Product };
   const { add } = useCart();
   const [qty, setQty] = useState(1);
-  const [refresh, setRefresh] = useState(0);
+  const [reviewRefresh, setReviewRefresh] = useState(0);
 
   function addToCart() {
     add(
@@ -95,12 +95,9 @@ function ProductPage() {
           </div>
         </div>
       </section>
-
-      <section className="container-page py-20 border-t border-border/60">
-        <Reviews productSlug={product.slug} refreshKey={refresh} />
-        <div className="mt-12 max-w-2xl mx-auto">
-          <ReviewForm productSlug={product.slug} onSubmitted={() => setRefresh((r) => r + 1)} />
-        </div>
+      <section className="container-page pb-20 grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+        <Reviews productSlug={product.slug} refreshKey={reviewRefresh} />
+        <ReviewForm productSlug={product.slug} onSubmitted={() => setReviewRefresh((v) => v + 1)} />
       </section>
     </>
   );

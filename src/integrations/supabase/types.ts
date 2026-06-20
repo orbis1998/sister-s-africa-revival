@@ -89,6 +89,63 @@ export type Database = {
         }
         Relationships: []
       }
+      wholesale_sales: {
+        Row: {
+          city_scope: string
+          created_at: string
+          created_by: string
+          customer_name: string
+          customer_phone: string | null
+          id: string
+          notes: string | null
+          payment_status: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          sold_at: string
+          total_fcfa: number
+          total_usd: number
+          unit_price_fcfa: number
+          unit_price_usd: number
+        }
+        Insert: {
+          city_scope: string
+          created_at?: string
+          created_by: string
+          customer_name: string
+          customer_phone?: string | null
+          id?: string
+          notes?: string | null
+          payment_status?: string
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+          sold_at?: string
+          total_fcfa?: number
+          total_usd?: number
+          unit_price_fcfa?: number
+          unit_price_usd?: number
+        }
+        Update: {
+          city_scope?: string
+          created_at?: string
+          created_by?: string
+          customer_name?: string
+          customer_phone?: string | null
+          id?: string
+          notes?: string | null
+          payment_status?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          sold_at?: string
+          total_fcfa?: number
+          total_usd?: number
+          unit_price_fcfa?: number
+          unit_price_usd?: number
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           address: string

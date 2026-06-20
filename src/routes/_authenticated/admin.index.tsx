@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { StaffShell } from "@/components/admin/AdminLayout";
-import { listStaffExpenses } from "@/lib/finance.functions";
+import { listStaffExpenses, listWholesaleSales } from "@/lib/finance.functions";
 import { directionFromCity, directionLabel, formatScopedMoney, STAFF_DIRECTIONS } from "@/lib/staff-scope";
 import { AlertTriangle, ClipboardList, DollarSign, MessageSquare, Package, ShoppingCart, Store } from "lucide-react";
 
@@ -39,7 +39,7 @@ function isSameDay(value: string, date: Date) {
 }
 
 function sumMoney(rows: any[], date?: Date) {
-  const filtered = date ? rows.filter((row) => isSameDay(row.delivered_at ?? row.created_at ?? row.spent_at, date)) : rows;
+  const filtered = date ? rows.filter((row) => isSameDay(row.delivered_at ?? row.sold_at ?? row.created_at ?? row.spent_at, date)) : rows;
   return filtered.reduce(
     (acc, row) => ({
       usd: acc.usd + Number(row.total_usd ?? row.amount_usd ?? 0),
@@ -51,6 +51,7 @@ function sumMoney(rows: any[], date?: Date) {
 
 function AdminDashboard() {
   const listExpenses = useServerFn(listStaffExpenses);
+  const listWholesale = useServerFn(listWholesaleSales);
   const { data: products } = useQuery({
     queryKey: ["admin-products"], queryFn: async () => (await supabase.from("products").select("id")).data ?? [],
   });
@@ -79,18 +80,22 @@ function AdminDashboard() {
     queryKey: ["admin-dashboard-expenses"],
     queryFn: () => listExpenses({}),
   });
+  const { data: wholesaleSales = [] } = useQuery({
+    queryKey: ["admin-dashboard-wholesale"],
+    queryFn: () => listWholesale({}),
+  });
 
   const posScopeById = Object.fromEntries((pos ?? []).map((p: any) => [p.id, directionFromCity(p.city)]));
   const salesWithScope = (sales ?? []).map((sale: any) => ({ ...sale, city_scope: posScopeById[sale.pos_id] ?? null }));
   const lowStock = (stock ?? []).filter((s: any) => s.quantity <= s.low_stock_threshold).length;
   const deliveredOrders = (orders ?? []).filter((o: any) => o.status === "delivered");
-  const revenueRows = [...deliveredOrders, ...salesWithScope];
+  const revenueRows = [...deliveredOrders, ...salesWithScope, ...wholesaleSales];
   const revenue = sumMoney(revenueRows);
   const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(today.getDate() - 7);
   const todayRevenue = sumMoney(revenueRows, today);
-  const yesterdayRevenue = sumMoney(revenueRows, yesterday);
+  const sevenDaysAgoRevenue = sumMoney(revenueRows, sevenDaysAgo);
   const expenseTotal = sumMoney(expenses);
   const todayExpenses = sumMoney(expenses, today);
   const pendingReviews = (reviews ?? []).filter((r: any) => !r.approved).length;
@@ -115,7 +120,7 @@ function AdminDashboard() {
       <h1 className="font-display text-4xl mt-2">Tableau de bord entreprise</h1>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
         <Stat icon={DollarSign} label="Recette aujourd'hui" value={`$${todayRevenue.usd.toFixed(2)}`} sub={`${todayRevenue.fcfa.toLocaleString("fr-FR")} FCFA`} dark />
-        <Stat icon={DollarSign} label="Recette hier" value={`$${yesterdayRevenue.usd.toFixed(2)}`} sub={`${yesterdayRevenue.fcfa.toLocaleString("fr-FR")} FCFA`} />
+        <Stat icon={DollarSign} label="Recette il y a 7 jours" value={`$${sevenDaysAgoRevenue.usd.toFixed(2)}`} sub={`${sevenDaysAgoRevenue.fcfa.toLocaleString("fr-FR")} FCFA`} />
         <Stat icon={DollarSign} label="Dépenses aujourd'hui" value={`$${todayExpenses.usd.toFixed(2)}`} sub={`${todayExpenses.fcfa.toLocaleString("fr-FR")} FCFA`} />
         <Stat icon={DollarSign} label="Net global" value={`$${(revenue.usd - expenseTotal.usd).toFixed(2)}`} sub={`${(revenue.fcfa - expenseTotal.fcfa).toLocaleString("fr-FR")} FCFA`} dark />
         <Stat icon={Package} label="Produits" value={products?.length ?? 0} />
@@ -124,6 +129,7 @@ function AdminDashboard() {
         <Stat icon={AlertTriangle} label="Alertes stock" value={lowStock} />
         <Stat icon={MessageSquare} label="Avis à valider" value={pendingReviews} />
         <Stat icon={ShoppingCart} label="Ventes POS" value={sales?.length ?? 0} />
+        <Stat icon={ShoppingCart} label="Ventes en gros" value={wholesaleSales.length} />
       </div>
 
       <div className="mt-10 rounded-2xl border border-border bg-card p-6">

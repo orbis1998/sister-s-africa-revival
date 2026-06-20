@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { StaffShell } from "@/components/admin/AdminLayout";
-import { createStaffExpense, listStaffExpenses } from "@/lib/finance.functions";
+import { createStaffExpense, createWholesaleSale, listStaffExpenses, listWholesaleSales } from "@/lib/finance.functions";
 import { directionLabel, formatScopedMoney } from "@/lib/staff-scope";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -13,22 +13,24 @@ export const Route = createFileRoute("/_authenticated/manager")({
   component: ManagerDashboard,
 });
 
-const labels: Record<string, string> = {
-  can_manage_products: "Produits", can_manage_stock: "Stock", can_manage_orders: "Commandes",
-  can_manage_logistics: "Logistique", can_view_accounting: "Comptabilité",
-  can_manage_pos: "Points de vente", can_manage_users: "Utilisateurs",
-};
-
 function ManagerDashboard() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const createExpense = useServerFn(createStaffExpense);
   const listExpenses = useServerFn(listStaffExpenses);
+  const createWholesale = useServerFn(createWholesaleSale);
+  const listWholesale = useServerFn(listWholesaleSales);
   const [expense, setExpense] = useState({ amount_usd: "", amount_fcfa: "", note: "" });
-  const { data: perms } = useQuery({
-    queryKey: ["manager-perms", user?.id],
-    queryFn: async () => user ? (await supabase.from("manager_permissions").select("*").eq("user_id", user.id).maybeSingle()).data : null,
-    enabled: !!user,
+  const [wholesale, setWholesale] = useState({
+    customer_name: "",
+    customer_phone: "",
+    product_id: "",
+    product_name: "",
+    quantity: "1",
+    unit_price_usd: "",
+    unit_price_fcfa: "",
+    payment_status: "pending",
+    notes: "",
   });
   const { data: profile } = useQuery({
     queryKey: ["manager-profile", user?.id],
@@ -38,6 +40,14 @@ function ManagerDashboard() {
   const { data: expenses = [] } = useQuery({
     queryKey: ["manager-expenses"],
     queryFn: () => listExpenses({}),
+  });
+  const { data: products = [] } = useQuery({
+    queryKey: ["manager-products"],
+    queryFn: async () => (await supabase.from("products").select("id,name").eq("is_active", true).order("name")).data ?? [],
+  });
+  const { data: wholesaleSales = [] } = useQuery({
+    queryKey: ["manager-wholesale-sales"],
+    queryFn: () => listWholesale({}),
   });
   const expenseMut = useMutation({
     mutationFn: () => createExpense({
@@ -54,8 +64,41 @@ function ManagerDashboard() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+  const wholesaleMut = useMutation({
+    mutationFn: () => {
+      const selected = products.find((p: any) => p.id === wholesale.product_id);
+      return createWholesale({
+        data: {
+          customer_name: wholesale.customer_name,
+          customer_phone: wholesale.customer_phone,
+          product_id: wholesale.product_id || null,
+          product_name: selected?.name ?? wholesale.product_name,
+          quantity: Number.parseInt(wholesale.quantity || "1", 10),
+          unit_price_usd: Number(wholesale.unit_price_usd || 0),
+          unit_price_fcfa: Number.parseInt(wholesale.unit_price_fcfa || "0", 10),
+          payment_status: wholesale.payment_status,
+          notes: wholesale.notes,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Vente en gros enregistrée");
+      setWholesale({
+        customer_name: "",
+        customer_phone: "",
+        product_id: "",
+        product_name: "",
+        quantity: "1",
+        unit_price_usd: "",
+        unit_price_fcfa: "",
+        payment_status: "pending",
+        notes: "",
+      });
+      qc.invalidateQueries({ queryKey: ["manager-wholesale-sales"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
 
-  const granted = perms ? Object.entries(perms).filter(([k, v]) => k.startsWith("can_") && v === true).map(([k]) => labels[k]).filter(Boolean) : [];
   const monthExpenses = expenses.reduce((sum: { usd: number; fcfa: number }, item: any) => {
     const d = new Date(item.spent_at);
     const now = new Date();
@@ -65,13 +108,22 @@ function ManagerDashboard() {
       fcfa: sum.fcfa + Number(item.amount_fcfa ?? 0),
     };
   }, { usd: 0, fcfa: 0 });
+  const monthWholesale = wholesaleSales.reduce((sum: { usd: number; fcfa: number }, item: any) => {
+    const d = new Date(item.sold_at);
+    const now = new Date();
+    if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return sum;
+    return {
+      usd: sum.usd + Number(item.total_usd ?? 0),
+      fcfa: sum.fcfa + Number(item.total_fcfa ?? 0),
+    };
+  }, { usd: 0, fcfa: 0 });
 
   return (
     <StaffShell title="Manager" requiredRole="manager">
       <span className="eyebrow">Espace manager</span>
       <h1 className="font-display text-4xl mt-2">Tableau de bord</h1>
       <p className="text-muted-foreground mt-2">
-        Direction : <strong>{directionLabel(profile?.city_scope)}</strong>. Vos permissions sont définies par l'administration.
+        Direction : <strong>{directionLabel(profile?.city_scope)}</strong>.
       </p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-border bg-card p-6">
@@ -82,18 +134,74 @@ function ManagerDashboard() {
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Dépenses signalées</div>
           <div className="font-display text-4xl mt-2">{expenses.length}</div>
         </div>
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">Ventes en gros du mois</div>
+          <div className="font-display text-4xl mt-2">{formatScopedMoney({ total_usd: monthWholesale.usd, total_fcfa: monthWholesale.fcfa }, profile?.city_scope)}</div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">Nombre ventes en gros</div>
+          <div className="font-display text-4xl mt-2">{wholesaleSales.length}</div>
+        </div>
       </div>
-      <div className="mt-8 bg-card border border-border rounded-2xl p-6">
-        <h2 className="font-display text-xl">Vos accès</h2>
-        {granted.length === 0 ? (
-          <p className="text-sm text-muted-foreground mt-2">Aucune permission accordée. Contactez votre administrateur.</p>
-        ) : (
-          <div className="flex flex-wrap gap-2 mt-3">
-            {granted.map((g) => <span key={g} className="px-3 py-1 rounded-full bg-copper/15 text-copper text-xs uppercase tracking-widest">{g}</span>)}
+      <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="font-display text-2xl">Vente en gros</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Le prix est fixé manuellement pour chaque vente.</p>
+          <div className="mt-5 grid gap-3">
+            <input placeholder="Nom du client / revendeur" value={wholesale.customer_name} onChange={(e) => setWholesale({ ...wholesale, customer_name: e.target.value })} className="input-admin" />
+            <input placeholder="Téléphone" value={wholesale.customer_phone} onChange={(e) => setWholesale({ ...wholesale, customer_phone: e.target.value })} className="input-admin" />
+            <select value={wholesale.product_id} onChange={(e) => {
+              const selected = products.find((p: any) => p.id === e.target.value);
+              setWholesale({ ...wholesale, product_id: e.target.value, product_name: selected?.name ?? "" });
+            }} className="input-admin">
+              <option value="">Sélectionner un produit</option>
+              {products.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            {!wholesale.product_id && (
+              <input placeholder="Produit vendu" value={wholesale.product_name} onChange={(e) => setWholesale({ ...wholesale, product_name: e.target.value })} className="input-admin" />
+            )}
+            <div className="grid grid-cols-3 gap-3">
+              <input type="number" min={1} placeholder="Qté" value={wholesale.quantity} onChange={(e) => setWholesale({ ...wholesale, quantity: e.target.value })} className="input-admin" />
+              <input type="number" min={0} step="0.01" placeholder="Prix USD" value={wholesale.unit_price_usd} onChange={(e) => setWholesale({ ...wholesale, unit_price_usd: e.target.value })} className="input-admin" />
+              <input type="number" min={0} placeholder="Prix FCFA" value={wholesale.unit_price_fcfa} onChange={(e) => setWholesale({ ...wholesale, unit_price_fcfa: e.target.value })} className="input-admin" />
+            </div>
+            <select value={wholesale.payment_status} onChange={(e) => setWholesale({ ...wholesale, payment_status: e.target.value })} className="input-admin">
+              <option value="pending">En attente</option>
+              <option value="paid">Payée</option>
+              <option value="partial">Partielle</option>
+              <option value="cancelled">Annulée</option>
+            </select>
+            <textarea placeholder="Détails / notes" value={wholesale.notes} onChange={(e) => setWholesale({ ...wholesale, notes: e.target.value })} className="input-admin resize-none" rows={3} />
+            <button
+              disabled={wholesaleMut.isPending || !wholesale.customer_name.trim() || !(wholesale.product_id || wholesale.product_name.trim())}
+              onClick={() => wholesaleMut.mutate()}
+              className="btn-hero disabled:opacity-50"
+            >
+              {wholesaleMut.isPending ? "Enregistrement..." : "Enregistrer la vente en gros"}
+            </button>
           </div>
-        )}
-        {perms?.notes && <p className="text-sm text-muted-foreground mt-4 italic">Note: {perms.notes}</p>}
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="font-display text-2xl">Dernières ventes en gros</h2>
+          <div className="mt-5 space-y-3">
+            {wholesaleSales.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucune vente en gros.</p>
+            ) : wholesaleSales.slice(0, 8).map((item: any) => (
+              <div key={item.id} className="rounded-xl bg-cream/70 p-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <strong>{item.product_name} × {item.quantity}</strong>
+                  <span className="text-xs text-muted-foreground">{new Date(item.sold_at).toLocaleDateString("fr-FR")}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">{item.customer_name}</span>
+                  <span className="font-medium text-copper">{formatScopedMoney({ total_usd: item.total_usd, total_fcfa: item.total_fcfa }, item.city_scope)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
+
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-2xl border border-border bg-card p-6">
           <h2 className="font-display text-2xl">Signaler une dépense</h2>

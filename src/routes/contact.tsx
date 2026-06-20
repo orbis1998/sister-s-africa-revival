@@ -37,14 +37,23 @@ const regions = [
     ],
   },
   {
-    label: "Congo Brazzaville",
-    whatsapp: "242065313192",
-    phone: "+242 06 531 3192 · +242 05 671 94 62",
+    label: "Congo — Brazzaville",
+    whatsapp: "242056719462",
+    phone: "+242 05 671 9462",
     points: [
       "Super U · Géant Casino, centre-ville Brazzaville",
       "Saja Market · Poto-Poto, Avenue de la Paix",
       "Mama Dina · Galerie Moka, Grand Marché",
-      "Expéditions : Pointe-Noire, Dakar, Abidjan, Paris, Libreville, Yaoundé & Douala",
+      "Expéditions : Dakar, Abidjan, Paris, Libreville, Yaoundé & Douala",
+    ],
+  },
+  {
+    label: "Congo — Pointe-Noire",
+    whatsapp: "242065313192",
+    phone: "+242 06 531 3192",
+    points: [
+      "Pointe-Noire · Service client dédié",
+      "Expéditions locales et accompagnement WhatsApp",
     ],
   },
 ];
@@ -60,7 +69,7 @@ function ContactPage() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-8">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
         {regions.map((r) => (
           <article key={r.label} className="bg-card border border-border rounded-sm p-8">
             <div className="eyebrow mb-2">{r.label}</div>

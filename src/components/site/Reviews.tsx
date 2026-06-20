@@ -24,6 +24,7 @@ export function Reviews({ productSlug, refreshKey }: { productSlug: string; refr
       .from("reviews")
       .select("*")
       .eq("product_slug", productSlug)
+      .eq("approved", true)
       .order("created_at", { ascending: false })
       .limit(50)
       .then(({ data }) => {

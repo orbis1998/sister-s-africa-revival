@@ -167,8 +167,16 @@ function HomePage() {
   );
 }
 
+interface HomeReview {
+  id: string;
+  author_name: string;
+  rating: number;
+  comment: string;
+  location: string | null;
+}
+
 function HomeReviews() {
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<HomeReview[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -177,9 +185,9 @@ function HomeReviews() {
       .select("id, author_name, rating, comment, location")
       .eq("approved", true)
       .order("created_at", { ascending: false })
-      .limit(8)
+      .limit(4)
       .then(({ data }) => {
-        if (!cancelled) setReviews(data ?? []);
+        if (!cancelled) setReviews((data as HomeReview[]) ?? []);
       });
     return () => {
       cancelled = true;
@@ -189,28 +197,28 @@ function HomeReviews() {
   if (reviews.length === 0) return null;
 
   return (
-    <section className="bg-clay/30 py-20">
-      <div className="container-page">
-        <div className="mb-10 text-center">
-          <div className="eyebrow mb-3">Avis clientes</div>
-          <h2 className="font-display text-4xl text-espresso md:text-5xl">Elles nous font confiance</h2>
-        </div>
-        <div className="flex gap-5 overflow-x-auto pb-3 snap-x">
-          {reviews.map((review) => (
-            <article key={review.id} className="min-w-[280px] snap-start rounded-3xl border border-border bg-card p-6 shadow-sm sm:min-w-[360px]">
-              <div className="mb-4 flex gap-1">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <Star key={n} className={`h-4 w-4 ${n <= review.rating ? "fill-gold text-gold" : "text-border"}`} />
-                ))}
-              </div>
-              <p className="text-sm leading-relaxed text-espresso/80 italic">"{review.comment}"</p>
-              <div className="mt-5 flex items-center justify-between text-xs">
-                <span className="font-medium text-espresso">{review.author_name}</span>
-                {review.location && <span className="text-muted-foreground">{review.location}</span>}
-              </div>
-            </article>
-          ))}
-        </div>
+    <section className="container-page py-24">
+      <div className="mb-12 max-w-2xl">
+        <div className="eyebrow mb-3">Avis validés</div>
+        <h2 className="font-display text-4xl text-espresso md:text-5xl">Elles ont testé nos formules</h2>
+        <p className="mt-4 text-muted-foreground">
+          Chaque témoignage publié a été vérifié par notre équipe avant d'apparaître ici.
+        </p>
+      </div>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {reviews.map((review) => (
+          <article key={review.id} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Star key={n} className={`h-4 w-4 ${n <= review.rating ? "fill-gold text-gold" : "text-border"}`} />
+              ))}
+            </div>
+            <p className="text-sm leading-relaxed text-espresso/80 italic">"{review.comment}"</p>
+            <div className="mt-5 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              {review.author_name}{review.location ? ` · ${review.location}` : ""}
+            </div>
+          </article>
+        ))}
       </div>
     </section>
   );
