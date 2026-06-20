@@ -22,21 +22,21 @@ function CartPage() {
   }
 
   return (
-    <section className="container-page py-20">
+    <section className="container-page overflow-x-hidden py-14 sm:py-20">
       <div className="eyebrow mb-3">Panier</div>
-      <h1 className="font-display text-5xl text-espresso mb-12">Votre sélection</h1>
+      <h1 className="font-display text-4xl text-espresso mb-8 sm:mb-12 sm:text-5xl">Votre sélection</h1>
 
       <div className="grid lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-6">
           {items.map((it) => (
-            <div key={`${it.slug}-${it.variantId}`} className="flex gap-6 pb-6 border-b border-border">
-              <div className="w-24 h-24 bg-clay/40 rounded-sm overflow-hidden shrink-0">
+            <div key={`${it.slug}-${it.variantId}`} className="rounded-2xl border border-border bg-card p-4 sm:flex sm:gap-6 sm:p-5">
+              <div className="h-40 w-full overflow-hidden rounded-xl bg-clay/40 sm:h-24 sm:w-24 sm:shrink-0">
                 <img src={it.image} alt={it.name} className="w-full h-full object-cover" />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="mt-4 min-w-0 flex-1 sm:mt-0">
                 <h3 className="font-display text-xl text-espresso">{it.name}</h3>
                 <p className="text-xs text-muted-foreground mt-1">{it.variantLabel}</p>
-                <div className="flex items-center gap-4 mt-3">
+                <div className="mt-4 flex flex-wrap items-center gap-3">
                   <div className="flex items-center border border-border rounded-sm">
                     <button onClick={() => setQty(it.slug, it.variantId, it.qty - 1)} className="px-3 py-1.5 text-sm">−</button>
                     <span className="px-3 text-sm w-8 text-center">{it.qty}</span>
@@ -50,7 +50,8 @@ function CartPage() {
                   </button>
                 </div>
               </div>
-              <div className="text-right shrink-0">
+              <div className="mt-4 flex items-end justify-between gap-3 border-t border-border pt-4 text-right sm:mt-0 sm:block sm:border-0 sm:pt-0">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground sm:hidden">Total article</span>
                 <div className="font-medium text-espresso">${it.priceUsd * it.qty}</div>
                 <div className="text-xs text-muted-foreground">{(it.priceFcfa * it.qty).toLocaleString("fr-FR")} FCFA</div>
               </div>
@@ -58,14 +59,14 @@ function CartPage() {
           ))}
         </div>
 
-        <aside className="bg-card border border-border rounded-sm p-8 h-fit lg:sticky lg:top-28">
+        <aside className="bg-card border border-border rounded-2xl p-5 h-fit sm:p-8 lg:sticky lg:top-28">
           <h2 className="font-display text-2xl text-espresso mb-6">Récapitulatif</h2>
           <div className="space-y-3 mb-6 pb-6 border-b border-border">
-            <div className="flex justify-between text-sm">
+            <div className="flex flex-col gap-1 text-sm sm:flex-row sm:justify-between">
               <span className="text-muted-foreground">Sous-total</span>
               <span className="text-espresso">${totalUsd} · {totalFcfa.toLocaleString("fr-FR")} FCFA</span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex flex-col gap-1 text-sm sm:flex-row sm:justify-between">
               <span className="text-muted-foreground">Livraison</span>
               <span className="text-espresso">Calculée à l'étape suivante</span>
             </div>

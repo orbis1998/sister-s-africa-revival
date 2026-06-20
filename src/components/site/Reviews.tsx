@@ -11,6 +11,7 @@ interface Review {
   before_image_url: string | null;
   after_image_url: string | null;
   created_at: string;
+  approved?: boolean | null;
 }
 
 export function Reviews({ productSlug, refreshKey }: { productSlug: string; refreshKey: number }) {
@@ -19,20 +20,32 @@ export function Reviews({ productSlug, refreshKey }: { productSlug: string; refr
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    supabase
-      .from("reviews")
-      .select("*")
-      .eq("product_slug", productSlug)
-      .eq("approved", true)
-      .order("created_at", { ascending: false })
-      .limit(50)
-      .then(({ data }) => {
-        if (!cancelled) {
-          setReviews((data as Review[]) || []);
-          setLoading(false);
-        }
-      });
+    async function loadReviews() {
+      setLoading(true);
+      let result = await supabase
+        .from("reviews")
+        .select("*")
+        .eq("product_slug", productSlug)
+        .eq("approved", true)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (result.error) {
+        result = await supabase
+          .from("reviews")
+          .select("*")
+          .eq("product_slug", productSlug)
+          .order("created_at", { ascending: false })
+          .limit(50);
+      }
+
+      const safeReviews = ((result.data as Review[]) ?? []).filter((review) => review.approved !== false);
+      if (!cancelled) {
+        setReviews(safeReviews);
+        setLoading(false);
+      }
+    }
+    loadReviews();
     return () => {
       cancelled = true;
     };

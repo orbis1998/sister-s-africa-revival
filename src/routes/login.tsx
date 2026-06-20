@@ -15,9 +15,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const { refreshRoles } = useAuth();
   const resolveBadge = useServerFn(resolveStaffBadgeLogin);
-  const [mode, setMode] = useState<"email" | "badge">("email");
-  const [email, setEmail] = useState("");
-  const [badge, setBadge] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -25,10 +23,11 @@ function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    let loginEmail = email.trim();
-    if (mode === "badge") {
+    const rawIdentifier = identifier.trim();
+    let loginEmail = rawIdentifier;
+    if (!rawIdentifier.includes("@")) {
       try {
-        const resolved = await resolveBadge({ data: { badge_id: badge } });
+        const resolved = await resolveBadge({ data: { badge_id: rawIdentifier } });
         loginEmail = (resolved as any).email;
       } catch (err: any) {
         toast.error(err?.message ?? "Badge invalide");
@@ -67,44 +66,18 @@ function LoginPage() {
         <span className="eyebrow">Connexion</span>
         <h1 className="font-display text-3xl mt-2">Accéder à mon espace</h1>
         <p className="text-sm text-muted-foreground mt-2">
-          Utilisez votre email ou votre badge staff. Votre rôle sera détecté automatiquement après connexion.
+          Utilisez votre email ou votre badge staff dans le même champ. Votre rôle sera détecté automatiquement.
         </p>
         <form onSubmit={onSubmit} className="space-y-4 mt-6">
-          <div className="grid grid-cols-2 gap-2 rounded-full bg-clay/60 p-1 text-xs uppercase tracking-widest">
-            <button
-              type="button"
-              onClick={() => setMode("email")}
-              className={`rounded-full px-3 py-2 transition ${mode === "email" ? "bg-espresso text-cream" : "text-espresso/70"}`}
-            >
-              Email
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("badge")}
-              className={`rounded-full px-3 py-2 transition ${mode === "badge" ? "bg-espresso text-cream" : "text-espresso/70"}`}
-            >
-              Badge staff
-            </button>
-          </div>
           <div>
-            <label className="text-xs uppercase tracking-widest">{mode === "email" ? "Email" : "Badge"}</label>
-            {mode === "email" ? (
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 w-full px-3 py-2 border border-border rounded bg-background"
-              />
-            ) : (
-              <input
-                required
-                value={badge}
-                onChange={(e) => setBadge(e.target.value)}
-                placeholder="Ex. MAN-KIN-001"
-                className="mt-1 w-full px-3 py-2 border border-border rounded bg-background uppercase"
-              />
-            )}
+            <label className="text-xs uppercase tracking-widest">Email ou badge</label>
+            <input
+              required
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="Email ou badge staff"
+              className="mt-1 w-full px-3 py-2 border border-border rounded bg-background"
+            />
           </div>
           <div>
             <label className="text-xs uppercase tracking-widest">Mot de passe</label>
