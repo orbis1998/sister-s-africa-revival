@@ -3,12 +3,15 @@ import { StaffShell } from "@/components/admin/AdminLayout";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listOrders, listDrivers, assignOrder, updateOrderStatus, createStaffOrder } from "@/lib/orders.functions";
-import { directionFromCity, formatScopedMoney } from "@/lib/staff-scope";
+import { directionFromCity, formatScopedMoney, directionCurrency, formatDeliveryFee } from "@/lib/staff-scope";
+import { formatCollectLabel } from "@/lib/seo";
 import { countries, findCountry } from "@/lib/locations";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, MessageCircle, Phone, MapPin, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { lookupCommuneDeliveryFee } from "@/lib/delivery.functions";
+import { formatDeliveryFeeByCountry } from "@/lib/staff-scope";
 
 export const Route = createFileRoute("/_authenticated/admin/logistics")({
   head: () => ({ meta: [{ title: "Logistique — Admin" }] }),
@@ -64,18 +67,46 @@ function emptyManualOrder(minDeliveryDate: string) {
   };
 }
 
+function formatManualOrderSummary(
+  products: { usd: number; fcfa: number },
+  deliveryFee: number,
+  countryCode: string,
+) {
+  if (countryCode === "CG") {
+    const total = products.fcfa + deliveryFee;
+    return {
+      productsLabel: `${products.fcfa.toLocaleString("fr-FR")} FCFA`,
+      deliveryLabel: formatDeliveryFeeByCountry(deliveryFee, countryCode),
+      collectLabel: `${total.toLocaleString("fr-FR")} FCFA`,
+    };
+  }
+  return {
+    productsLabel: `$${products.usd.toFixed(2)}`,
+    deliveryLabel: formatDeliveryFeeByCountry(deliveryFee, countryCode),
+    collectLabel: `$${products.usd.toFixed(2)} + ${deliveryFee.toLocaleString("fr-FR")} CDF`,
+  };
+}
+
 function LogisticsPage() {
   const list = useServerFn(listOrders);
   const drv = useServerFn(listDrivers);
   const assign = useServerFn(assignOrder);
   const upd = useServerFn(updateOrderStatus);
   const createManual = useServerFn(createStaffOrder);
+  const lookupFee = useServerFn(lookupCommuneDeliveryFee);
   const qc = useQueryClient();
   const [filter, setFilter] = useState<string>("all");
   const [manualOpen, setManualOpen] = useState(false);
   const minDeliveryDate = tomorrowInputDate();
   const [manual, setManual] = useState<any>(() => emptyManualOrder(minDeliveryDate));
   const [manualProduct, setManualProduct] = useState({ product_id: "", qty: 1 });
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [feeLoading, setFeeLoading] = useState(false);
+
+  const manualCity = useMemo(
+    () => findCountry(manual.country_code)?.cities.find((c) => c.name === manual.city),
+    [manual.country_code, manual.city],
+  );
 
   const orders = useQuery({ queryKey: ["orders"], queryFn: () => list() });
   const drivers = useQuery({ queryKey: ["drivers"], queryFn: () => drv() });
@@ -90,6 +121,25 @@ function LogisticsPage() {
       fcfa: sum.fcfa + Number(item.priceFcfa ?? 0) * Number(item.qty ?? 1),
     }), { usd: 0, fcfa: 0 });
   }, [manual.items]);
+
+  const manualSummary = useMemo(
+    () => formatManualOrderSummary(manualTotals, deliveryFee, manual.country_code),
+    [manualTotals, deliveryFee, manual.country_code],
+  );
+
+  useEffect(() => {
+    if (!manual.city || !manual.commune) {
+      setDeliveryFee(0);
+      return;
+    }
+    let cancelled = false;
+    setFeeLoading(true);
+    lookupFee({ data: { country_code: manual.country_code, city: manual.city, commune: manual.commune } })
+      .then((fee) => { if (!cancelled) setDeliveryFee(fee.fee_fcfa ?? 0); })
+      .catch(() => { if (!cancelled) setDeliveryFee(0); })
+      .finally(() => { if (!cancelled) setFeeLoading(false); });
+    return () => { cancelled = true; };
+  }, [manual.country_code, manual.city, manual.commune, lookupFee]);
 
   const assignMut = useMutation({
     mutationFn: (v: { order_id: string; driver_id: string | null }) => assign({ data: v }),
@@ -108,6 +158,7 @@ function LogisticsPage() {
       setManualOpen(false);
       setManual(emptyManualOrder(minDeliveryDate));
       setManualProduct({ product_id: "", qty: 1 });
+      setDeliveryFee(0);
       qc.invalidateQueries({ queryKey: ["orders"] });
     },
     onError: (e: any) => toast.error(e.message),
@@ -147,9 +198,20 @@ function LogisticsPage() {
               {countries.map((country) => <option key={country.code} value={country.code}>{country.name}</option>)}
             </select>
             <select value={manual.city} onChange={(e) => setManual({ ...manual, city: e.target.value, commune: "" })} className="input-admin">
+              <option value="">Sélectionner une ville…</option>
               {(findCountry(manual.country_code)?.cities ?? []).map((city) => <option key={city.name} value={city.name}>{city.name}</option>)}
             </select>
-            <input placeholder="Commune / quartier" value={manual.commune} onChange={(e) => setManual({ ...manual, commune: e.target.value })} className="input-admin" />
+            <select
+              value={manual.commune}
+              onChange={(e) => setManual({ ...manual, commune: e.target.value })}
+              disabled={!manualCity}
+              className="input-admin"
+            >
+              <option value="">{manualCity ? "Sélectionner une commune…" : "Choisissez d'abord la ville"}</option>
+              {manualCity?.communes.map((commune) => (
+                <option key={commune} value={commune}>{commune}</option>
+              ))}
+            </select>
             <input placeholder="Adresse précise" value={manual.address} onChange={(e) => setManual({ ...manual, address: e.target.value })} className="input-admin" />
             <input type="date" min={minDeliveryDate} value={manual.delivery_date} onChange={(e) => setManual({ ...manual, delivery_date: e.target.value })} className="input-admin" />
             <input type="time" value={manual.delivery_time} onChange={(e) => setManual({ ...manual, delivery_time: e.target.value })} className="input-admin" />
@@ -167,7 +229,9 @@ function LogisticsPage() {
                 <option value="">Sélectionner un produit</option>
                 {(products.data ?? []).map((product: any) => (
                   <option key={product.id} value={product.id}>
-                    {product.name} — ${product.price_usd} / {Number(product.price_fcfa).toLocaleString("fr-FR")} FCFA
+                    {product.name} — {manual.country_code === "CG"
+                      ? `${Number(product.price_fcfa).toLocaleString("fr-FR")} FCFA`
+                      : `$${product.price_usd}`}
                   </option>
                 ))}
               </select>
@@ -206,7 +270,9 @@ function LogisticsPage() {
                   <div>
                     <strong>{item.qty} × {item.name}</strong>
                     <div className="text-xs text-muted-foreground">
-                      {(item.priceFcfa * item.qty).toLocaleString("fr-FR")} FCFA · ${item.priceUsd * item.qty}
+                      {manual.country_code === "CG"
+                        ? `${(item.priceFcfa * item.qty).toLocaleString("fr-FR")} FCFA`
+                        : `$${(item.priceUsd * item.qty).toFixed(2)}`}
                     </div>
                   </div>
                   <button type="button" onClick={() => setManual({ ...manual, items: manual.items.filter((current: any) => current.variantId !== item.variantId) })} className="rounded-full p-2 text-red-600 hover:bg-red-50">
@@ -215,15 +281,28 @@ function LogisticsPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 rounded-xl bg-clay p-4 text-sm">
-              Total automatique : <strong>{manualTotals.fcfa.toLocaleString("fr-FR")} FCFA</strong> · ${manualTotals.usd}
+            <div className="mt-4 rounded-xl bg-clay p-4 text-sm space-y-2">
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Produits</span>
+                <strong>{manualSummary.productsLabel}</strong>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">
+                  Livraison{manual.commune ? ` (${manual.commune})` : ""}
+                </span>
+                <strong>{feeLoading ? "Calcul…" : manualSummary.deliveryLabel}</strong>
+              </div>
+              <div className="flex justify-between gap-4 border-t border-espresso/10 pt-2">
+                <span className="text-espresso">Total à encaisser</span>
+                <strong className="text-copper">{manualSummary.collectLabel}</strong>
+              </div>
             </div>
           </div>
           <div className="mt-4 flex justify-end gap-2">
             <button className="btn-ghost" onClick={() => setManualOpen(false)}>Annuler</button>
             <button
               className="btn-hero"
-              disabled={createMut.isPending || manual.items.length === 0}
+              disabled={createMut.isPending || manual.items.length === 0 || !manual.commune || !manual.city || !manual.customer_name.trim()}
               onClick={() => {
                 const country = findCountry(manual.country_code)!;
                 createMut.mutate({
@@ -231,6 +310,8 @@ function LogisticsPage() {
                   country_name: country.name,
                   total_usd: manualTotals.usd,
                   total_fcfa: manualTotals.fcfa,
+                  delivery_fee_fcfa: deliveryFee,
+                  delivery_fee_usd: 0,
                   assigned_to: manual.assigned_to || null,
                 });
               }}
@@ -250,9 +331,11 @@ function LogisticsPage() {
           {filtered.map((o: any) => {
             const meta = statusMeta(o.status);
             const itemsTxt = (o.items as any[]).map((it) => `• ${it.qty} × ${it.name} (${it.variantLabel})`).join("\n");
-            const totalLabel = formatScopedMoney(o, o.city_scope);
-            const customerMsg = `Bonjour ${o.customer_name}, votre commande *${o.order_number}* chez The Sisters est maintenant *${meta.label.toLowerCase()}*.\n\n${itemsTxt}\n\nTotal : ${totalLabel}`;
-            const driverMsg = o.driver ? `Bonjour ${o.driver.full_name ?? ""}, nouvelle livraison à effectuer :\n\nCommande : *${o.order_number}*\nClient : ${o.customer_name} (${o.customer_phone})\nAdresse : ${o.address}, ${o.commune}, ${o.city}\nLivraison : ${deliveryLabel(o)}\n${o.notes ? "Notes : " + o.notes + "\n" : ""}\nArticles :\n${itemsTxt}\n\nTotal à encaisser : ${totalLabel}` : "";
+            const productsLabel = formatScopedMoney(o, o.city_scope);
+            const deliveryLabelMoney = formatDeliveryFee(o.delivery_fee_fcfa ?? 0, o.city_scope);
+            const collectLabel = formatCollectLabel(o, directionCurrency(o.city_scope) as "FCFA" | "USD");
+            const customerMsg = `Bonjour ${o.customer_name}, votre commande *${o.order_number}* chez The Sisters est maintenant *${meta.label.toLowerCase()}*.\n\n${itemsTxt}\n\nProduits : ${productsLabel}\nLivraison : ${deliveryLabelMoney}\nTotal : ${collectLabel}`;
+            const driverMsg = o.driver ? `Bonjour ${o.driver.full_name ?? ""}, nouvelle livraison à effectuer :\n\nCommande : *${o.order_number}*\nClient : ${o.customer_name} (${o.customer_phone})\nAdresse : ${o.address}, ${o.commune}, ${o.city}\nLivraison : ${deliveryLabel(o)}\n${o.notes ? "Notes : " + o.notes + "\n" : ""}\nArticles :\n${itemsTxt}\n\nSolde produits : ${productsLabel}\nFrais livraison : ${deliveryLabelMoney}\nTotal à encaisser : ${collectLabel}` : "";
             return (
               <div key={o.id} className="bg-card border border-border rounded p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
@@ -265,7 +348,13 @@ function LogisticsPage() {
                     <div className="mt-1 text-xs text-copper">Livraison : {deliveryLabel(o)}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-display text-2xl text-copper">{totalLabel}</div>
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Solde produits</div>
+                    <div className="font-display text-2xl text-copper">{productsLabel}</div>
+                    {(o.delivery_fee_fcfa || o.delivery_fee_usd) ? (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        + livraison {deliveryLabelMoney} · encaisser {collectLabel}
+                      </div>
+                    ) : null}
                     <div className="text-xs text-muted-foreground">{o.city}</div>
                   </div>
                 </div>

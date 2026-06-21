@@ -4,16 +4,22 @@ import { fetchProductBySlug, formatPrice, type Product } from "@/lib/products";
 import { useCart } from "@/lib/cart";
 import { ReviewForm } from "@/components/site/ReviewForm";
 import { Reviews } from "@/components/site/Reviews";
+import { RichContent } from "@/components/site/RichContent";
 import { ShoppingBag, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { buildSeoMeta } from "@/lib/seo";
 
 export const Route = createFileRoute("/product/$slug")({
-  head: () => ({
-    meta: [
-      { title: "Produit — The Sisters Africa" },
-      { name: "description", content: "Découvrez ce produit The Sisters Africa et commandez via WhatsApp." },
-    ],
-  }),
+  head: ({ loaderData }) => {
+    const product = loaderData?.product;
+    return buildSeoMeta({
+      title: product?.seo_title || `${product?.name ?? "Produit"} — The Sisters Africa`,
+      description: product?.seo_description || product?.description || "Découvrez ce produit The Sisters Africa et commandez via WhatsApp.",
+      image: product?.image_url ?? undefined,
+      url: `https://thesistersafrica.com/product/${product?.slug ?? ""}`,
+      type: "product",
+    });
+  },
   loader: async ({ params }) => {
     const product = await fetchProductBySlug(params.slug);
     if (!product) throw notFound();
@@ -79,8 +85,14 @@ function ProductPage() {
             <span className="text-sm text-muted-foreground">· {formatPrice(product.price_fcfa, product.price_usd).split(" · ")[0]}</span>
           </div>
 
-          {product.description && (
-            <p className="text-espresso/80 leading-relaxed mb-8">{product.description}</p>
+          {(product.content_html || product.description) && (
+            <div className="mb-8">
+              {product.content_html ? (
+                <RichContent html={product.content_html} />
+              ) : (
+                <p className="text-espresso/80 leading-relaxed">{product.description}</p>
+              )}
+            </div>
           )}
 
           <div className="flex items-center gap-3 mb-8">

@@ -37,6 +37,7 @@ export const createOrder = createServerFn({ method: "POST" })
     notes?: string;
     items: Array<{ slug: string; name: string; variantId: string; variantLabel: string; qty: number; priceUsd: number; priceFcfa: number }>;
     total_fcfa: number; total_usd: number;
+    delivery_fee_fcfa?: number; delivery_fee_usd?: number;
   }) => d)
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -56,6 +57,8 @@ export const createOrder = createServerFn({ method: "POST" })
       items: data.items,
       total_fcfa: data.total_fcfa,
       total_usd: data.total_usd,
+      delivery_fee_fcfa: data.delivery_fee_fcfa ?? 0,
+      delivery_fee_usd: data.delivery_fee_usd ?? 0,
     }).select("order_number, id").single();
     if (error) throw new Error(error.message);
     return row;
@@ -71,6 +74,7 @@ export const createStaffOrder = createServerFn({ method: "POST" })
     notes?: string; assigned_to?: string | null;
     items?: Array<{ slug?: string; name: string; variantId?: string; variantLabel?: string; qty: number; priceUsd?: number; priceFcfa?: number }>;
     total_fcfa: number; total_usd: number;
+    delivery_fee_fcfa?: number; delivery_fee_usd?: number;
   }) => d)
   .handler(async ({ data, context }) => {
     const ctx = context as any;
@@ -105,6 +109,8 @@ export const createStaffOrder = createServerFn({ method: "POST" })
       items: data.items?.length ? data.items : [{ name: "Commande manuelle", qty: 1 }],
       total_fcfa: data.total_fcfa,
       total_usd: data.total_usd,
+      delivery_fee_fcfa: data.delivery_fee_fcfa ?? 0,
+      delivery_fee_usd: data.delivery_fee_usd ?? 0,
     }).select("order_number, id").single();
     if (error) throw new Error(error.message);
     return row;

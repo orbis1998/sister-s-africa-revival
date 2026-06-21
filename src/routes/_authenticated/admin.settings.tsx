@@ -118,6 +118,31 @@ function SettingsPage() {
         </div>
       </div>
 
+      <div className="mt-8 rounded-2xl border border-border bg-card p-6">
+        <h2 className="font-display text-2xl">SEO & réseaux sociaux</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Meta tags globaux du site (Open Graph, Twitter, Google).</p>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <Field label="Titre SEO global">
+            <input value={form.seo_title ?? ""} onChange={(e) => setForm({ ...form, seo_title: e.target.value })} className="input-admin" />
+          </Field>
+          <Field label="URL du site">
+            <input value={form.site_url ?? ""} onChange={(e) => setForm({ ...form, site_url: e.target.value })} className="input-admin" />
+          </Field>
+          <Field label="Description SEO" className="sm:col-span-2">
+            <textarea value={form.seo_description ?? ""} onChange={(e) => setForm({ ...form, seo_description: e.target.value })} className="input-admin resize-none" rows={3} />
+          </Field>
+          <Field label="Mots-clés">
+            <input value={form.seo_keywords ?? ""} onChange={(e) => setForm({ ...form, seo_keywords: e.target.value })} className="input-admin" />
+          </Field>
+          <Field label="Twitter / X">
+            <input value={form.twitter_handle ?? ""} onChange={(e) => setForm({ ...form, twitter_handle: e.target.value })} className="input-admin" placeholder="@thesistersafrica" />
+          </Field>
+          <Field label="Image Open Graph (URL)" className="sm:col-span-2">
+            <input value={form.og_image_url ?? ""} onChange={(e) => setForm({ ...form, og_image_url: e.target.value })} className="input-admin" placeholder="https://..." />
+          </Field>
+        </div>
+      </div>
+
       <button onClick={() => save.mutate()} disabled={save.isPending} className="btn-hero mt-8">
         {save.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Enregistrement</> : "Enregistrer les paramètres"}
       </button>

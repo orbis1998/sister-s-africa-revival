@@ -1,15 +1,23 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCart } from "@/lib/cart";
 import { countries, findCountry } from "@/lib/locations";
+import { formatDeliveryFeeByCountry } from "@/lib/staff-scope";
 import { MessageCircle, Loader2 } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { createOrder } from "@/lib/orders.functions";
+import { lookupCommuneDeliveryFee } from "@/lib/delivery.functions";
+import { orderCollectTotal } from "@/lib/seo";
+import { buildSeoMeta } from "@/lib/seo";
 
 export const Route = createFileRoute("/checkout")({
-  head: () => ({ meta: [{ title: "Commande — The Sisters Africa" }] }),
+  head: () => buildSeoMeta({
+    title: "Commande — The Sisters Africa",
+    description: "Finalisez votre commande et recevez vos bouillies bio The Sisters Africa à domicile.",
+    url: "https://thesistersafrica.com/checkout",
+  }),
   component: CheckoutPage,
 });
 
@@ -38,8 +46,11 @@ function CheckoutPage() {
   const { items, totalFcfa, totalUsd, clear } = useCart();
   const navigate = useNavigate();
   const placeOrder = useServerFn(createOrder);
+  const lookupFee = useServerFn(lookupCommuneDeliveryFee);
   const minDeliveryDate = useMemo(() => tomorrowInputDate(), []);
   const [submitting, setSubmitting] = useState(false);
+  const [deliveryFee, setDeliveryFee] = useState({ fee_fcfa: 0, fee_usd: 0 });
+  const [feeLoading, setFeeLoading] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     phone: "",
@@ -54,6 +65,26 @@ function CheckoutPage() {
 
   const country = useMemo(() => findCountry(form.countryCode)!, [form.countryCode]);
   const cityObj = country.cities.find((c) => c.name === form.city);
+  const totals = orderCollectTotal({
+    total_fcfa: totalFcfa,
+    total_usd: totalUsd,
+    delivery_fee_fcfa: deliveryFee.fee_fcfa,
+    delivery_fee_usd: deliveryFee.fee_usd,
+  });
+
+  useEffect(() => {
+    if (!form.city || !form.commune) {
+      setDeliveryFee({ fee_fcfa: 0, fee_usd: 0 });
+      return;
+    }
+    let cancelled = false;
+    setFeeLoading(true);
+    lookupFee({ data: { country_code: form.countryCode, city: form.city, commune: form.commune } })
+      .then((fee) => { if (!cancelled) setDeliveryFee(fee); })
+      .catch(() => { if (!cancelled) setDeliveryFee({ fee_fcfa: 0, fee_usd: 0 }); })
+      .finally(() => { if (!cancelled) setFeeLoading(false); });
+    return () => { cancelled = true; };
+  }, [form.countryCode, form.city, form.commune, lookupFee]);
 
   function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -95,6 +126,8 @@ function CheckoutPage() {
         })),
         total_fcfa: totalFcfa,
         total_usd: totalUsd,
+        delivery_fee_fcfa: deliveryFee.fee_fcfa,
+        delivery_fee_usd: deliveryFee.fee_usd,
       } });
       orderNumber = (res as any)?.order_number ?? "";
     } catch (err: any) {
@@ -124,7 +157,11 @@ function CheckoutPage() {
       );
     });
     lines.push("");
-    lines.push(`*Total : ${totalFcfa.toLocaleString("fr-FR")} FCFA · $${totalUsd}*`);
+    lines.push(`*Sous-total produits : ${totalFcfa.toLocaleString("fr-FR")} FCFA · $${totalUsd}*`);
+    if (deliveryFee.fee_fcfa) {
+      lines.push(`*Frais livraison (${parsed.data.commune}) : ${formatDeliveryFeeByCountry(deliveryFee.fee_fcfa, country.code)}*`);
+    }
+    lines.push(`*Total à encaisser : ${totals.collect_fcfa.toLocaleString("fr-FR")} FCFA · $${totals.collect_usd}*`);
 
     const message = encodeURIComponent(lines.join("\n"));
     const whatsappNumber = cityObj?.whatsapp ?? country.whatsapp;
@@ -212,6 +249,13 @@ function CheckoutPage() {
                     <option key={cm} value={cm}>{cm}</option>
                   ))}
                 </select>
+                {form.commune && (
+                  <span className="mt-1 block text-[11px] text-copper">
+                    {feeLoading
+                      ? "Calcul des frais de livraison…"
+                      : `Livraison : ${formatDeliveryFeeByCountry(deliveryFee.fee_fcfa, form.countryCode)}`}
+                  </span>
+                )}
               </Field>
               <Field label="Adresse précise">
                 <input
@@ -266,13 +310,26 @@ function CheckoutPage() {
               </div>
             ))}
           </div>
-          <div className="flex justify-between items-baseline mb-6">
-            <span className="font-display text-lg text-espresso">Total</span>
-            <div className="text-right">
-              <div className="font-display text-2xl text-copper">${totalUsd}</div>
-              <div className="text-xs text-muted-foreground">{totalFcfa.toLocaleString("fr-FR")} FCFA</div>
+          <div className="space-y-2 mb-6 pb-6 border-b border-border">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Sous-total produits</span>
+              <span>${totalUsd} · {totalFcfa.toLocaleString("fr-FR")} FCFA</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Frais livraison{form.commune ? ` (${form.commune})` : ""}</span>
+              <span>{feeLoading ? "…" : formatDeliveryFeeByCountry(deliveryFee.fee_fcfa, form.countryCode)}</span>
             </div>
           </div>
+          <div className="flex justify-between items-baseline mb-6">
+            <span className="font-display text-lg text-espresso">Total à payer</span>
+            <div className="text-right">
+              <div className="font-display text-2xl text-copper">${totals.collect_usd}</div>
+              <div className="text-xs text-muted-foreground">{totals.collect_fcfa.toLocaleString("fr-FR")} FCFA</div>
+            </div>
+          </div>
+          <p className="mb-4 text-[11px] text-muted-foreground">
+            Le solde produits ({totalFcfa.toLocaleString("fr-FR")} FCFA) est séparé des frais livraison pour la comptabilité interne.
+          </p>
           <button type="submit" disabled={submitting || items.length === 0} className="btn-hero w-full disabled:opacity-50">
             {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Redirection…</> : <><MessageCircle className="w-4 h-4" /> Commander par WhatsApp</>}
           </button>

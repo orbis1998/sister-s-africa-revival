@@ -18,6 +18,7 @@ import { AuthProvider } from "@/lib/auth";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { WhatsAppFloat } from "@/components/site/WhatsAppFloat";
+import { buildSeoMeta } from "@/lib/seo";
 
 function NotFoundComponent() {
   return (
@@ -65,24 +66,24 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "The Sisters Africa — Bouillies bio pour une prise de poids saine" },
-      { name: "description", content: "Mass Gainer, Super Grow et Peanut Butter : bouillies bio d'origine végétale. Livraison à Kinshasa, Lubumbashi, Brazzaville et Pointe-Noire." },
-      { property: "og:title", content: "The Sisters Africa" },
-      { property: "og:description", content: "Bouillies bio pour une prise de poids saine et naturelle." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Tenor+Sans&family=Inter:wght@300;400;500;600;700&display=swap" },
-    ],
-  }),
+  head: () => {
+    const seo = buildSeoMeta({
+      title: "The Sisters Africa — Bouillies bio pour une prise de poids saine",
+      description: "Mass Gainer, Super Grow et Peanut Butter : bouillies bio d'origine végétale. Livraison à Kinshasa, Lubumbashi, Brazzaville et Pointe-Noire.",
+      keywords: "The Sisters Africa, bouillie bio, prise de poids, Mass Gainer, Super Grow, Kinshasa, Brazzaville, Pointe-Noire",
+      url: "https://thesistersafrica.com",
+    });
+    return {
+      ...seo,
+      links: [
+        ...(seo.links ?? []),
+        { rel: "stylesheet", href: appCss },
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+        { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Tenor+Sans&family=Inter:wght@300;400;500;600;700&display=swap" },
+      ],
+    };
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,

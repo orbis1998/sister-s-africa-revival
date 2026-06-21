@@ -56,6 +56,99 @@ export type Database = {
         }
         Relationships: []
       }
+      blog_posts: {
+        Row: {
+          category: string | null
+          content_html: string | null
+          cover_image_url: string | null
+          created_at: string
+          excerpt: string | null
+          id: string
+          is_published: boolean
+          read_time: string | null
+          seo_description: string | null
+          seo_title: string | null
+          slug: string
+          sort_order: number
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category?: string | null
+          content_html?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          is_published?: boolean
+          read_time?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          slug: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category?: string | null
+          content_html?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          is_published?: boolean
+          read_time?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          slug?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      commune_delivery_fees: {
+        Row: {
+          city: string
+          city_scope: string | null
+          commune: string
+          country_code: string
+          created_at: string
+          fee_fcfa: number
+          fee_usd: number
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          city: string
+          city_scope?: string | null
+          commune: string
+          country_code: string
+          created_at?: string
+          fee_fcfa?: number
+          fee_usd?: number
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          city?: string
+          city_scope?: string | null
+          commune?: string
+          country_code?: string
+          created_at?: string
+          fee_fcfa?: number
+          fee_usd?: number
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       staff_expenses: {
         Row: {
           amount_fcfa: number
@@ -161,6 +254,8 @@ export type Database = {
           delivery_date: string | null
           delivery_time: string | null
           delivered_at: string | null
+          delivery_fee_fcfa: number
+          delivery_fee_usd: number
           id: string
           items: Json
           notes: string | null
@@ -184,6 +279,8 @@ export type Database = {
           delivery_date?: string | null
           delivery_time?: string | null
           delivered_at?: string | null
+          delivery_fee_fcfa?: number
+          delivery_fee_usd?: number
           id?: string
           items?: Json
           notes?: string | null
@@ -207,6 +304,8 @@ export type Database = {
           delivery_date?: string | null
           delivery_time?: string | null
           delivered_at?: string | null
+          delivery_fee_fcfa?: number
+          delivery_fee_usd?: number
           id?: string
           items?: Json
           notes?: string | null
@@ -304,6 +403,7 @@ export type Database = {
       }
       products: {
         Row: {
+          content_html: string | null
           created_at: string
           description: string | null
           id: string
@@ -314,10 +414,13 @@ export type Database = {
           price_fcfa: number
           price_usd: number
           quantity: number
+          seo_description: string | null
+          seo_title: string | null
           slug: string
           updated_at: string
         }
         Insert: {
+          content_html?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -328,10 +431,13 @@ export type Database = {
           price_fcfa?: number
           price_usd?: number
           quantity?: number
+          seo_description?: string | null
+          seo_title?: string | null
           slug: string
           updated_at?: string
         }
         Update: {
+          content_html?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -342,6 +448,8 @@ export type Database = {
           price_fcfa?: number
           price_usd?: number
           quantity?: number
+          seo_description?: string | null
+          seo_title?: string | null
           slug?: string
           updated_at?: string
         }
@@ -432,6 +540,12 @@ export type Database = {
           hero_subtitle: string
           hero_title: string
           id: boolean
+          og_image_url: string | null
+          seo_description: string | null
+          seo_keywords: string | null
+          seo_title: string | null
+          site_url: string | null
+          twitter_handle: string | null
           updated_at: string
           updated_by: string | null
           whatsapp_number: string
@@ -445,6 +559,12 @@ export type Database = {
           hero_subtitle?: string
           hero_title?: string
           id?: boolean
+          og_image_url?: string | null
+          seo_description?: string | null
+          seo_keywords?: string | null
+          seo_title?: string | null
+          site_url?: string | null
+          twitter_handle?: string | null
           updated_at?: string
           updated_by?: string | null
           whatsapp_number?: string
@@ -458,6 +578,12 @@ export type Database = {
           hero_subtitle?: string
           hero_title?: string
           id?: boolean
+          og_image_url?: string | null
+          seo_description?: string | null
+          seo_keywords?: string | null
+          seo_title?: string | null
+          site_url?: string | null
+          twitter_handle?: string | null
           updated_at?: string
           updated_by?: string | null
           whatsapp_number?: string

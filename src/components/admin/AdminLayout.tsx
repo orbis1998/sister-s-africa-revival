@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, Package, Boxes, Store, LogOut, Truck, Briefcase, ClipboardList, Star, Settings, ShoppingCart, HandCoins } from "lucide-react";
+import { LayoutDashboard, Users, Package, Boxes, Store, LogOut, Truck, Briefcase, ClipboardList, Star, Settings, ShoppingCart, HandCoins, BookOpen } from "lucide-react";
 import { useAuth, type AppRole } from "@/lib/auth";
 import { useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -24,6 +24,7 @@ const adminLinks: NavLink[] = [
   { to: "/admin/logistics", label: "Logistique", icon: ClipboardList },
   { to: "/admin/wholesale", label: "Vente en gros", icon: HandCoins },
   { to: "/admin/reviews", label: "Avis clients", icon: Star },
+  { to: "/admin/blog", label: "Blog", icon: BookOpen },
   { to: "/admin/pos", label: "Points de vente", icon: Store },
   { to: "/admin/settings", label: "Paramètres", icon: Settings },
 ];
@@ -65,6 +66,7 @@ export function StaffShell({
   const links: NavLink[] = primaryRole === "admin" ? adminLinks
     : primaryRole === "manager" ? [
       { to: "/manager", label: "Manager", icon: Briefcase, exact: true },
+      { to: "/admin/products", label: "Produits", icon: Package, permissions: ["can_manage_products"] },
       { to: "/admin/logistics", label: "Commandes", icon: ClipboardList, permissions: ["can_manage_orders", "can_manage_logistics"] },
       { to: "/admin/wholesale", label: "Vente en gros", icon: HandCoins },
     ]

@@ -5,7 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { createStaffExpense, createWholesaleSale, listStaffExpenses, listWholesaleSales } from "@/lib/finance.functions";
-import { directionLabel, formatScopedMoney } from "@/lib/staff-scope";
+import { listCommuneDeliveryFees, upsertCommuneDeliveryFees } from "@/lib/delivery.functions";
+import { directionLabel, formatScopedMoney, directionDeliveryCurrency } from "@/lib/staff-scope";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -20,6 +21,8 @@ function ManagerDashboard() {
   const listExpenses = useServerFn(listStaffExpenses);
   const createWholesale = useServerFn(createWholesaleSale);
   const listWholesale = useServerFn(listWholesaleSales);
+  const listFees = useServerFn(listCommuneDeliveryFees);
+  const saveFees = useServerFn(upsertCommuneDeliveryFees);
   const [expense, setExpense] = useState({ amount_usd: "", amount_fcfa: "", note: "" });
   const [wholesale, setWholesale] = useState({
     customer_name: "",
@@ -48,6 +51,36 @@ function ManagerDashboard() {
   const { data: wholesaleSales = [] } = useQuery({
     queryKey: ["manager-wholesale-sales"],
     queryFn: () => listWholesale({}),
+  });
+  const { data: deliveryFees = [], refetch: refetchFees } = useQuery({
+    queryKey: ["manager-delivery-fees", profile?.city_scope],
+    enabled: !!profile?.city_scope,
+    queryFn: () => listFees({ data: { city_scope: profile!.city_scope! } }),
+  });
+  const [feeDraft, setFeeDraft] = useState<Record<string, { local: string }>>({});
+  const deliveryCurrency = directionDeliveryCurrency(profile?.city_scope);
+  const feeMut = useMutation({
+    mutationFn: () => saveFees({
+      data: {
+        fees: deliveryFees.map((fee: any) => {
+          const raw = feeDraft[fee.id]?.local ?? String(fee.fee_fcfa ?? 0);
+          const parsed = Number.parseInt(raw, 10);
+          return {
+            id: fee.id,
+            country_code: fee.country_code,
+            city: fee.city,
+            commune: fee.commune,
+            fee_fcfa: Number.isNaN(parsed) ? 0 : Math.max(0, parsed),
+            fee_usd: 0,
+          };
+        }),
+      },
+    }),
+    onSuccess: () => {
+      toast.success("Frais de livraison enregistrés");
+      refetchFees();
+    },
+    onError: (e: any) => toast.error(e.message),
   });
   const expenseMut = useMutation({
     mutationFn: () => createExpense({
@@ -143,6 +176,46 @@ function ManagerDashboard() {
           <div className="font-display text-4xl mt-2">{wholesaleSales.length}</div>
         </div>
       </div>
+
+      <div className="mt-8 rounded-2xl border border-border bg-card p-6">
+        <h2 className="font-display text-2xl">Frais de livraison par commune</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Fixez le prix de livraison en <strong>{deliveryCurrency}</strong> pour chaque commune de votre direction.
+          Le client le voit automatiquement au checkout.
+        </p>
+        <div className="mt-5 max-h-[420px] overflow-auto rounded-xl border border-border">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-cream text-left text-[10px] uppercase tracking-widest text-muted-foreground">
+              <tr>
+                <th className="p-3">Ville</th>
+                <th className="p-3">Commune</th>
+                <th className="p-3">Frais livraison ({deliveryCurrency})</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deliveryFees.map((fee: any) => (
+                <tr key={fee.id} className="border-t border-border">
+                  <td className="p-3">{fee.city}</td>
+                  <td className="p-3">{fee.commune}</td>
+                  <td className="p-3">
+                    <input
+                      type="number"
+                      min={0}
+                      className="input-admin w-36"
+                      value={feeDraft[fee.id]?.local ?? String(fee.fee_fcfa ?? 0)}
+                      onChange={(e) => setFeeDraft((d) => ({ ...d, [fee.id]: { local: e.target.value } }))}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button disabled={feeMut.isPending || !deliveryFees.length} onClick={() => feeMut.mutate()} className="btn-hero mt-4 disabled:opacity-50">
+          {feeMut.isPending ? "Enregistrement..." : "Enregistrer les frais de livraison"}
+        </button>
+      </div>
+
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-2xl border border-border bg-card p-6">
           <h2 className="font-display text-2xl">Vente en gros</h2>

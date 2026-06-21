@@ -15,6 +15,12 @@ export const defaultSiteSettings: SiteSettings = {
   cta_href: "/products",
   whatsapp_number: "243994186790",
   hero_images: [heroImg],
+  seo_title: "The Sisters Africa — Bouillies bio pour une prise de poids saine",
+  seo_description: "Mass Gainer, Super Grow et Peanut Butter : bouillies bio d'origine végétale. Livraison à Kinshasa, Lubumbashi, Brazzaville et Pointe-Noire.",
+  seo_keywords: "The Sisters Africa, bouillie bio, prise de poids, Mass Gainer, Super Grow, Kinshasa, Brazzaville",
+  og_image_url: null,
+  site_url: "https://thesistersafrica.com",
+  twitter_handle: "@thesistersafrica",
   updated_at: new Date(0).toISOString(),
   updated_by: null,
 };

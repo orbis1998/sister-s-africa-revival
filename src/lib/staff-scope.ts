@@ -28,6 +28,24 @@ export function directionCurrency(direction?: string | null) {
   return STAFF_DIRECTIONS.find((d) => d.value === direction)?.currency ?? "USD";
 }
 
+/** Devise locale pour les frais de livraison : CDF (RDC) ou FCFA (Congo). */
+export function directionDeliveryCurrency(direction?: string | null): "CDF" | "FCFA" {
+  return directionCurrency(direction) === "FCFA" ? "FCFA" : "CDF";
+}
+
+export function formatDeliveryFee(amount: number, direction?: string | null) {
+  const currency = directionDeliveryCurrency(direction);
+  return currency === "FCFA"
+    ? `${Number(amount).toLocaleString("fr-FR")} FCFA`
+    : `${Number(amount).toLocaleString("fr-FR")} CDF`;
+}
+
+export function formatDeliveryFeeByCountry(amount: number, countryCode?: string | null) {
+  return countryCode === "CG"
+    ? `${Number(amount).toLocaleString("fr-FR")} FCFA`
+    : `${Number(amount).toLocaleString("fr-FR")} CDF`;
+}
+
 export function formatScopedMoney(value: { total_usd?: number | null; total_fcfa?: number | null }, direction?: string | null) {
   return directionCurrency(direction) === "FCFA"
     ? `${Number(value.total_fcfa ?? 0).toLocaleString("fr-FR")} FCFA`

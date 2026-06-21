@@ -86,15 +86,27 @@ export const adminDeleteUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+async function assertProductEditor(ctx: { supabase: any; userId: string }) {
+  const { data: isAdmin } = await ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" });
+  if (isAdmin) return;
+  const { data: perms } = await ctx.supabase
+    .from("manager_permissions")
+    .select("can_manage_products")
+    .eq("user_id", ctx.userId)
+    .maybeSingle();
+  if (!perms?.can_manage_products) throw new Error("Forbidden: gestion produits non autorisée");
+}
+
 export const adminUpsertProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
-    id?: string; slug: string; name: string; description?: string;
+    id?: string; slug: string; name: string; description?: string; content_html?: string;
+    seo_title?: string; seo_description?: string;
     price_usd: number; price_fcfa: number; quantity?: number; image_url?: string;
     is_active?: boolean; is_bestseller?: boolean;
   }) => d)
   .handler(async ({ data, context }) => {
-    await assertAdmin(context as any);
+    await assertProductEditor(context as any);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("products").upsert(data, { onConflict: "slug" });
     if (error) throw new Error(error.message);
@@ -192,6 +204,12 @@ export const adminUpdateSiteSettings = createServerFn({ method: "POST" })
     cta_href: string;
     whatsapp_number: string;
     hero_images: string[];
+    seo_title?: string;
+    seo_description?: string;
+    seo_keywords?: string;
+    og_image_url?: string;
+    site_url?: string;
+    twitter_handle?: string;
   }) => d)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as any);

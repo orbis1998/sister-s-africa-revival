@@ -3,7 +3,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 export type Product = Database["public"]["Tables"]["products"]["Row"];
 
-const productSelect = "id, slug, name, description, price_usd, price_fcfa, quantity, image_url, is_active, is_bestseller, created_at, updated_at";
+const productSelect = "id, slug, name, description, content_html, seo_title, seo_description, price_usd, price_fcfa, quantity, image_url, is_active, is_bestseller, created_at, updated_at";
 
 export async function fetchProducts() {
   const { data, error } = await supabase

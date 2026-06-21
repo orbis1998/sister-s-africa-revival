@@ -5,7 +5,8 @@ import { Truck, MapPin, Phone, MessageCircle, Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listOrders, updateOrderStatus } from "@/lib/orders.functions";
-import { toast } from "sonner";
+import { orderCollectTotal } from "@/lib/seo";
+import { directionCurrency, formatDeliveryFee } from "@/lib/staff-scope";
 
 export const Route = createFileRoute("/_authenticated/livreur")({
   component: LivreurDashboard,
@@ -55,6 +56,8 @@ function LivreurDashboard() {
         <div className="mt-8 space-y-4">
           {active.map((o: any) => {
             const itemsTxt = (o.items as any[]).map((it) => `• ${it.qty} × ${it.name}`).join("\n");
+            const totals = orderCollectTotal(o);
+            const currency = directionCurrency(o.city_scope);
             const msg = `Bonjour ${o.customer_name}, je suis votre livreur The Sisters pour la commande *${o.order_number}*. Je me dirige vers vous.`;
             const phone = o.customer_phone.replace(/[^\d]/g, "");
             return (
@@ -65,7 +68,38 @@ function LivreurDashboard() {
                     <div className="text-xs text-muted-foreground">{new Date(o.created_at).toLocaleString("fr-FR")}</div>
                     <div className="mt-1 text-xs text-copper">Livraison : {deliveryLabel(o)}</div>
                   </div>
-                  <div className="font-display text-copper">{o.total_fcfa.toLocaleString("fr-FR")} FCFA</div>
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground">À encaisser</div>
+                    <div className="font-display text-copper">
+                      {currency === "FCFA"
+                        ? `${totals.collect_fcfa.toLocaleString("fr-FR")} FCFA`
+                        : `$${totals.collect_usd.toFixed(2)}`}
+                    </div>
+                  </div>
+                </div>
+                <div className="mb-3 grid gap-2 rounded-xl bg-cream/60 p-3 text-xs sm:grid-cols-3">
+                  <div>
+                    <div className="text-muted-foreground">Solde produits</div>
+                    <div className="font-medium">
+                      {currency === "FCFA"
+                        ? `${totals.products_fcfa.toLocaleString("fr-FR")} FCFA`
+                        : `$${totals.products_usd.toFixed(2)}`}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Frais livraison</div>
+                    <div className="font-medium text-copper">
+                      {formatDeliveryFee(totals.delivery_fcfa, o.city_scope)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Total client</div>
+                    <div className="font-medium">
+                      {currency === "FCFA"
+                        ? `${totals.collect_fcfa.toLocaleString("fr-FR")} FCFA`
+                        : `$${totals.collect_usd.toFixed(2)}`}
+                    </div>
+                  </div>
                 </div>
                 <div className="text-sm space-y-1 mb-3">
                   <div className="text-espresso font-medium">{o.customer_name}</div>

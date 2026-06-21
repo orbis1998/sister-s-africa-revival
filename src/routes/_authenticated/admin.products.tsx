@@ -7,6 +7,7 @@ import { StaffShell } from "@/components/admin/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { adminUpsertProduct, adminDeleteProduct } from "@/lib/admin.functions";
 import { Loader2, Plus, Trash2, Pencil, Upload } from "lucide-react";
+import { RichContentEditor } from "@/components/admin/RichContentEditor";
 
 export const Route = createFileRoute("/_authenticated/admin/products")({
   component: ProductsPage,
@@ -16,6 +17,9 @@ const empty = {
   slug: "",
   name: "",
   description: "",
+  content_html: "",
+  seo_title: "",
+  seo_description: "",
   price_usd: "",
   price_fcfa: "",
   quantity: "",
@@ -72,7 +76,7 @@ function ProductsPage() {
   });
 
   return (
-    <StaffShell title="Administration" requiredRole="admin">
+    <StaffShell title="Administration" requiredRole={["admin", "manager"]} requiredPermission="can_manage_products">
       <div className="flex justify-between items-end">
         <div>
           <span className="eyebrow">Catalogue</span>
@@ -120,8 +124,21 @@ function ProductsPage() {
               <Field label="Slug (URL)" className="col-span-2">
                 <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} className="input-admin" placeholder="ex. mass-gainer" />
               </Field>
-              <Field label="Description" className="col-span-2">
-                <textarea value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-admin resize-none" rows={3} />
+              <Field label="Résumé court" className="col-span-2">
+                <textarea value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-admin resize-none" rows={2} placeholder="Texte court pour les cartes produit et SEO fallback" />
+              </Field>
+              <Field label="Description riche (Shopify-like)" className="col-span-2">
+                <RichContentEditor
+                  value={form.content_html ?? ""}
+                  onChange={(html) => setForm({ ...form, content_html: html })}
+                  uploadBucket="product-images"
+                />
+              </Field>
+              <Field label="SEO — Titre">
+                <input value={form.seo_title ?? ""} onChange={(e) => setForm({ ...form, seo_title: e.target.value })} className="input-admin" placeholder="Titre meta personnalisé" />
+              </Field>
+              <Field label="SEO — Description">
+                <input value={form.seo_description ?? ""} onChange={(e) => setForm({ ...form, seo_description: e.target.value })} className="input-admin" placeholder="Description meta" />
               </Field>
               <Field label="Prix (USD)">
                 <input type="number" step="0.01" min={0} value={form.price_usd || ""} onChange={(e) => setForm({ ...form, price_usd: e.target.value })} className="input-admin" />
