@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { StaffShell } from "@/components/admin/AdminLayout";
+import { exportCompanyReport, exportCompanyReportPdf } from "@/lib/accounting.functions";
 import { listStaffExpenses, listWholesaleSales } from "@/lib/finance.functions";
-import { directionFromCity, directionLabel, formatScopedMoney, STAFF_DIRECTIONS } from "@/lib/staff-scope";
-import { AlertTriangle, ClipboardList, DollarSign, MessageSquare, Package, ShoppingCart, Store } from "lucide-react";
+import { ADMIN_REPORT_REGIONS, directionFromCity, directionLabel } from "@/lib/staff-scope";
+import { AlertTriangle, ClipboardList, DollarSign, Download, FileText, MessageSquare, Package, ShoppingCart, Store, TrendingUp } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   component: AdminDashboard,
@@ -52,8 +55,14 @@ function sumMoney(rows: any[], date?: Date) {
 function AdminDashboard() {
   const listExpenses = useServerFn(listStaffExpenses);
   const listWholesale = useServerFn(listWholesaleSales);
+  const exportReportFn = useServerFn(exportCompanyReport);
+  const exportPdfFn = useServerFn(exportCompanyReportPdf);
+  const [reportFrom, setReportFrom] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
+  const [reportTo, setReportTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [exporting, setExporting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const { data: products } = useQuery({
-    queryKey: ["admin-products"], queryFn: async () => (await supabase.from("products").select("id")).data ?? [],
+    queryKey: ["admin-products"], queryFn: async () => (await supabase.from("products").select("id, price_usd, price_fcfa")).data ?? [],
   });
   const { data: pos } = useQuery({
     queryKey: ["admin-pos"], queryFn: async () => (await supabase.from("points_of_sale").select("id, city")).data ?? [],
@@ -99,33 +108,86 @@ function AdminDashboard() {
   const expenseTotal = sumMoney(expenses);
   const todayExpenses = sumMoney(expenses, today);
   const pendingReviews = (reviews ?? []).filter((r: any) => !r.approved).length;
-  const byDirection = STAFF_DIRECTIONS.map((direction) => {
-    const scopedRevenue = sumMoney(revenueRows.filter((row: any) => row.city_scope === direction.value));
-    const scopedExpenses = sumMoney(expenses.filter((row: any) => row.city_scope === direction.value));
+  const pendingOrders = (orders ?? []).filter((o: any) => !["delivered", "cancelled"].includes(o.status)).length;
+  const byRegion = ADMIN_REPORT_REGIONS.map((region) => {
+    const scopedRevenue = sumMoney(revenueRows.filter((row: any) => region.scopes.includes(row.city_scope)));
+    const scopedExpenses = sumMoney(expenses.filter((row: any) => region.scopes.includes(row.city_scope)));
     return {
-      direction,
+      region,
       revenue: scopedRevenue,
       expenses: scopedExpenses,
       net: {
         usd: scopedRevenue.usd - scopedExpenses.usd,
         fcfa: scopedRevenue.fcfa - scopedExpenses.fcfa,
       },
-      orders: deliveredOrders.filter((row: any) => row.city_scope === direction.value).length,
+      orders: deliveredOrders.filter((row: any) => region.scopes.includes(row.city_scope)).length,
     };
   });
+
+  const posStockValue = useMemo(() => {
+    return (stock ?? []).reduce((sum: { usd: number; fcfa: number }, row: any) => {
+      const product = (products ?? []).find((p: any) => p.id === row.product_id);
+      if (!product) return sum;
+      return {
+        usd: sum.usd + Number(product.price_usd ?? 0) * Number(row.quantity ?? 0),
+        fcfa: sum.fcfa + Number(product.price_fcfa ?? 0) * Number(row.quantity ?? 0),
+      };
+    }, { usd: 0, fcfa: 0 });
+  }, [stock, products]);
+
+  async function downloadReport(format: "csv" | "pdf") {
+    try {
+      if (format === "csv") setExporting(true);
+      else setExportingPdf(true);
+      const result = format === "csv"
+        ? await exportReportFn({ data: { from: reportFrom, to: reportTo } })
+        : await exportPdfFn({ data: { from: reportFrom, to: reportTo } });
+      const blob = format === "csv"
+        ? new Blob([`\uFEFF${(result as any).csv}`], { type: "text/csv;charset=utf-8" })
+        : (() => {
+            const bytes = Uint8Array.from(atob((result as any).pdfBase64), (c) => c.charCodeAt(0));
+            return new Blob([bytes], { type: "application/pdf" });
+          })();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = result.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success(format === "csv" ? "Rapport CSV téléchargé" : "Rapport PDF téléchargé");
+    } catch (e: any) {
+      toast.error(e.message ?? "Export impossible");
+    } finally {
+      setExporting(false);
+      setExportingPdf(false);
+    }
+  }
 
   return (
     <StaffShell title="Administration" requiredRole="admin">
       <span className="eyebrow">Vue d'ensemble</span>
-      <h1 className="font-display text-4xl mt-2">Tableau de bord entreprise</h1>
+      <div className="flex flex-wrap items-end justify-between gap-4 mt-2">
+        <h1 className="font-display text-4xl">Tableau de bord entreprise</h1>
+        <div className="flex flex-wrap items-end gap-2">
+          <input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} className="input-admin !py-2 !text-sm" />
+          <input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} className="input-admin !py-2 !text-sm" />
+          <button onClick={() => downloadReport("csv")} disabled={exporting || exportingPdf} className="btn-hero !py-2 !text-xs">
+            <Download className="w-4 h-4" /> {exporting ? "Export..." : "CSV"}
+          </button>
+          <button onClick={() => downloadReport("pdf")} disabled={exporting || exportingPdf} className="btn-ghost !py-2 !text-xs border border-border">
+            <FileText className="w-4 h-4" /> {exportingPdf ? "PDF..." : "PDF pro"}
+          </button>
+        </div>
+      </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
         <Stat icon={DollarSign} label="Recette aujourd'hui" value={`$${todayRevenue.usd.toFixed(2)}`} sub={`${todayRevenue.fcfa.toLocaleString("fr-FR")} FCFA`} dark />
         <Stat icon={DollarSign} label="Recette il y a 7 jours" value={`$${sevenDaysAgoRevenue.usd.toFixed(2)}`} sub={`${sevenDaysAgoRevenue.fcfa.toLocaleString("fr-FR")} FCFA`} />
         <Stat icon={DollarSign} label="Dépenses aujourd'hui" value={`$${todayExpenses.usd.toFixed(2)}`} sub={`${todayExpenses.fcfa.toLocaleString("fr-FR")} FCFA`} />
-        <Stat icon={DollarSign} label="Net global" value={`$${(revenue.usd - expenseTotal.usd).toFixed(2)}`} sub={`${(revenue.fcfa - expenseTotal.fcfa).toLocaleString("fr-FR")} FCFA`} dark />
+        <Stat icon={TrendingUp} label="Net global" value={`$${(revenue.usd - expenseTotal.usd).toFixed(2)}`} sub={`${(revenue.fcfa - expenseTotal.fcfa).toLocaleString("fr-FR")} FCFA`} dark />
+        <Stat icon={Package} label="Valeur stock POS" value={`$${posStockValue.usd.toFixed(2)}`} sub={`${posStockValue.fcfa.toLocaleString("fr-FR")} FCFA`} />
         <Stat icon={Package} label="Produits" value={products?.length ?? 0} />
         <Stat icon={Store} label="Points de vente" value={pos?.length ?? 0} />
-        <Stat icon={ClipboardList} label="Commandes" value={orders?.length ?? 0} sub="Toutes les commandes" />
+        <Stat icon={ClipboardList} label="Commandes en cours" value={pendingOrders} sub={`${orders?.length ?? 0} au total`} />
         <Stat icon={AlertTriangle} label="Alertes stock" value={lowStock} />
         <Stat icon={MessageSquare} label="Avis à valider" value={pendingReviews} />
         <Stat icon={ShoppingCart} label="Ventes POS" value={sales?.length ?? 0} />
@@ -135,21 +197,24 @@ function AdminDashboard() {
       <div className="mt-10 rounded-2xl border border-border bg-card p-6">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <div className="eyebrow mb-2">Directions</div>
-            <h2 className="font-display text-2xl">CA, dépenses et net par ville</h2>
+            <div className="eyebrow mb-2">Comptabilité</div>
+            <h2 className="font-display text-2xl">CA, dépenses et net par région</h2>
           </div>
           <div className="text-right text-xs text-muted-foreground">
-            CA basé sur commandes livrées + ventes POS
+            Produits uniquement — frais de livraison non comptabilisés
           </div>
         </div>
-        <div className="mt-6 grid gap-4 lg:grid-cols-4">
-          {byDirection.map((row) => (
-            <div key={row.direction.value} className="rounded-2xl border border-border bg-cream/70 p-5">
-              <h3 className="font-display text-xl">{row.direction.label}</h3>
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          {byRegion.map((row) => (
+            <div key={row.region.key} className="rounded-2xl border border-border bg-cream/70 p-5">
+              <h3 className="font-display text-xl">{row.region.label}</h3>
               <div className="mt-4 space-y-3 text-sm">
-                <Line label="CA" value={formatScopedMoney({ total_usd: row.revenue.usd, total_fcfa: row.revenue.fcfa }, row.direction.value)} />
-                <Line label="Dépenses" value={formatScopedMoney({ total_usd: row.expenses.usd, total_fcfa: row.expenses.fcfa }, row.direction.value)} />
-                <Line label="Net" value={formatScopedMoney({ total_usd: row.net.usd, total_fcfa: row.net.fcfa }, row.direction.value)} strong />
+                <Line label="Recettes USD" value={`$${row.revenue.usd.toFixed(2)}`} />
+                <Line label="Recettes FCFA" value={`${row.revenue.fcfa.toLocaleString("fr-FR")} FCFA`} />
+                <Line label="Dépenses USD" value={`$${row.expenses.usd.toFixed(2)}`} />
+                <Line label="Dépenses FCFA" value={`${row.expenses.fcfa.toLocaleString("fr-FR")} FCFA`} />
+                <Line label="Net USD" value={`$${row.net.usd.toFixed(2)}`} strong />
+                <Line label="Net FCFA" value={`${row.net.fcfa.toLocaleString("fr-FR")} FCFA`} />
                 <Line label="Commandes livrées" value={row.orders} />
               </div>
             </div>

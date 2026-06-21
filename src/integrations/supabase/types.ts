@@ -455,6 +455,53 @@ export type Database = {
         }
         Relationships: []
       }
+      product_variants: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          price_fcfa: number
+          price_usd: number
+          product_id: string
+          sort_order: number
+          updated_at: string
+          weight_unit: string
+          weight_value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          price_fcfa?: number
+          price_usd?: number
+          product_id: string
+          sort_order?: number
+          updated_at?: string
+          weight_unit: string
+          weight_value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          price_fcfa?: number
+          price_usd?: number
+          product_id?: string
+          sort_order?: number
+          updated_at?: string
+          weight_unit?: string
+          weight_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variants_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           badge_id: string | null
@@ -709,6 +756,19 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      record_pos_sale: {
+        Args: {
+          p_customer_name: string
+          p_customer_phone: string
+          p_items: Json
+          p_payment_method: string
+          p_pos_id: string
+          p_sold_by: string
+          p_total_fcfa: number
+          p_total_usd: number
+        }
+        Returns: string
       }
     }
     Enums: {

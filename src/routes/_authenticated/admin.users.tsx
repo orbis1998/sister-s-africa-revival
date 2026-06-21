@@ -36,11 +36,11 @@ function UsersPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<any>({
     email: "", password: "", full_name: "", phone: "", badge_id: "",
-    role: "livreur", city_scope: "kinshasa", permissions: {}, pos_id: "",
+    role: "livreur", city_scope: "kinshasa", permissions: {}, pos_id: "", pos_ids: [] as string[],
   });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => createFn({ data }),
+    mutationFn: (data: any) => createFn({ data: { ...data, pos_ids: data.pos_ids ?? [] } }),
     onSuccess: () => { toast.success("Compte créé"); setOpen(false); qc.invalidateQueries({ queryKey: ["admin-users"] }); },
     onError: (e: any) => toast.error(e.message),
   });
@@ -138,6 +138,28 @@ function UsersPage() {
                     </label>
                   ))}
                 </div>
+                {form.permissions.can_manage_stock && (
+                  <div className="mt-4 rounded-xl border border-border bg-cream/40 p-4">
+                    <div className="text-xs uppercase tracking-widest mb-2">Points de vente autorisés (stock)</div>
+                    <div className="grid gap-2">
+                      {posList.map((p: any) => (
+                        <label key={p.id} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={(form.pos_ids as string[]).includes(p.id)}
+                            onChange={(e) => {
+                              const current = new Set(form.pos_ids as string[]);
+                              if (e.target.checked) current.add(p.id);
+                              else current.delete(p.id);
+                              setForm({ ...form, pos_ids: [...current] });
+                            }}
+                          />
+                          {p.name}{p.city ? ` · ${p.city}` : ""}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             <div className="flex gap-2 mt-6 justify-end">

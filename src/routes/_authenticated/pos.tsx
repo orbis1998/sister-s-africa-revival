@@ -6,6 +6,9 @@ import { Loader2, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { useServerFn } from "@tanstack/react-start";
+import { createPosSale } from "@/lib/pos.functions";
+import { formatVariantLabel } from "@/lib/product-variants";
 
 export const Route = createFileRoute("/_authenticated/pos")({
   component: PosDashboard,
@@ -14,7 +17,16 @@ export const Route = createFileRoute("/_authenticated/pos")({
 function PosDashboard() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [sale, setSale] = useState<any>({ customer_name: "", customer_phone: "", product_id: "", qty: 1, payment_method: "cash", items: [] });
+  const createSaleFn = useServerFn(createPosSale);
+  const [sale, setSale] = useState<any>({
+    customer_name: "",
+    customer_phone: "",
+    product_id: "",
+    variant_id: "",
+    qty: 1,
+    payment_method: "cash",
+    items: [],
+  });
 
   const assignment = useQuery({
     queryKey: ["pos-assignment", user?.id],
@@ -34,6 +46,11 @@ function PosDashboard() {
     queryFn: async () => (await supabase.from("products").select("*").eq("is_active", true).order("name")).data ?? [],
   });
 
+  const variants = useQuery({
+    queryKey: ["pos-variants"],
+    queryFn: async () => (await supabase.from("product_variants").select("*").eq("is_active", true).order("sort_order")).data ?? [],
+  });
+
   const stock = useQuery({
     queryKey: ["pos-stock", assignment.data?.pos_id],
     enabled: !!assignment.data?.pos_id,
@@ -47,6 +64,25 @@ function PosDashboard() {
   });
 
   const selectedProduct = products.data?.find((p: any) => p.id === sale.product_id);
+  const productVariants = useMemo(() => {
+    if (!selectedProduct) return [];
+    const rows = (variants.data ?? []).filter((v: any) => v.product_id === selectedProduct.id);
+    if (rows.length) return rows;
+    return [{
+      id: selectedProduct.id,
+      product_id: selectedProduct.id,
+      weight_value: 1,
+      weight_unit: "kg",
+      price_usd: selectedProduct.price_usd,
+      price_fcfa: selectedProduct.price_fcfa,
+    }];
+  }, [selectedProduct, variants.data]);
+  const selectedVariant = productVariants.find((v: any) => v.id === sale.variant_id) ?? productVariants[0];
+  const availableQty = useMemo(() => {
+    if (!selectedProduct || !assignment.data?.pos_id) return 0;
+    const row = (stock.data ?? []).find((s: any) => s.product_id === selectedProduct.id);
+    return row?.quantity ?? 0;
+  }, [selectedProduct, assignment.data?.pos_id, stock.data]);
   const totalFcfa = sale.items.reduce((sum: number, item: any) => sum + Number(item.price_fcfa ?? 0) * Number(item.qty ?? 1), 0);
   const totalUsd = sale.items.reduce((sum: number, item: any) => sum + Number(item.price_usd ?? 0) * Number(item.qty ?? 1), 0);
 
@@ -59,23 +95,23 @@ function PosDashboard() {
   const createSale = useMutation({
     mutationFn: async () => {
       if (!user || !assignment.data?.pos_id || sale.items.length === 0) throw new Error("Vente incomplète");
-      const payload = {
-        pos_id: assignment.data.pos_id,
-        sold_by: user.id,
-        customer_name: sale.customer_name || null,
-        customer_phone: sale.customer_phone || null,
-        payment_method: sale.payment_method,
-        total_fcfa: totalFcfa,
-        total_usd: totalUsd,
-        items: sale.items,
-      };
-      const { error } = await supabase.from("pos_sales").insert(payload);
-      if (error) throw error;
+      return createSaleFn({
+        data: {
+          pos_id: assignment.data.pos_id,
+          customer_name: sale.customer_name || undefined,
+          customer_phone: sale.customer_phone || undefined,
+          payment_method: sale.payment_method,
+          total_fcfa: totalFcfa,
+          total_usd: totalUsd,
+          items: sale.items,
+        },
+      });
     },
     onSuccess: () => {
-      toast.success("Vente enregistrée");
-      setSale({ customer_name: "", customer_phone: "", product_id: "", qty: 1, payment_method: "cash", items: [] });
+      toast.success("Vente enregistrée — stock mis à jour");
+      setSale({ customer_name: "", customer_phone: "", product_id: "", variant_id: "", qty: 1, payment_method: "cash", items: [] });
       qc.invalidateQueries({ queryKey: ["pos-sales", assignment.data?.pos_id] });
+      qc.invalidateQueries({ queryKey: ["pos-stock", assignment.data?.pos_id] });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -106,29 +142,49 @@ function PosDashboard() {
               <div className="mt-5 grid gap-3">
                 <input placeholder="Nom client (optionnel)" value={sale.customer_name} onChange={(e) => setSale({ ...sale, customer_name: e.target.value })} className="input-admin" />
                 <input placeholder="Téléphone client (optionnel)" value={sale.customer_phone} onChange={(e) => setSale({ ...sale, customer_phone: e.target.value })} className="input-admin" />
-                <select value={sale.product_id} onChange={(e) => setSale({ ...sale, product_id: e.target.value })} className="input-admin">
+                <select value={sale.product_id} onChange={(e) => setSale({ ...sale, product_id: e.target.value, variant_id: "" })} className="input-admin">
                   <option value="">Produit vendu</option>
                   {(products.data ?? []).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
+                {selectedProduct && productVariants.length > 1 && (
+                  <select value={sale.variant_id || selectedVariant?.id || ""} onChange={(e) => setSale({ ...sale, variant_id: e.target.value })} className="input-admin">
+                    {productVariants.map((v: any) => (
+                      <option key={v.id} value={v.id}>
+                        {formatVariantLabel(Number(v.weight_value), v.weight_unit)} · ${v.price_usd}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {selectedProduct && (
+                  <p className="text-xs text-muted-foreground">Stock disponible : {availableQty} unité{availableQty !== 1 ? "s" : ""}</p>
+                )}
                 <input type="number" min={1} value={sale.qty} onChange={(e) => setSale({ ...sale, qty: parseInt(e.target.value) || 1 })} className="input-admin" />
                 <button
                   type="button"
-                  disabled={!selectedProduct}
+                  disabled={!selectedProduct || !selectedVariant || availableQty <= 0}
                   onClick={() => {
-                    if (!selectedProduct) return;
+                    if (!selectedProduct || !selectedVariant) return;
+                    const qty = Number(sale.qty || 1);
+                    if (qty > availableQty) {
+                      toast.error(`Stock insuffisant (${availableQty} disponible)`);
+                      return;
+                    }
+                    const label = formatVariantLabel(Number(selectedVariant.weight_value), selectedVariant.weight_unit);
                     const item = {
                       product_id: selectedProduct.id,
                       slug: selectedProduct.slug,
                       name: selectedProduct.name,
-                      qty: Number(sale.qty || 1),
-                      price_fcfa: Number(selectedProduct.price_fcfa),
-                      price_usd: Number(selectedProduct.price_usd),
+                      variant_id: selectedVariant.id,
+                      variant_label: label,
+                      qty,
+                      price_fcfa: Number(selectedVariant.price_fcfa),
+                      price_usd: Number(selectedVariant.price_usd),
                     };
-                    const existingIndex = sale.items.findIndex((current: any) => current.product_id === item.product_id);
+                    const existingIndex = sale.items.findIndex((current: any) => current.product_id === item.product_id && current.variant_id === item.variant_id);
                     const nextItems = existingIndex >= 0
                       ? sale.items.map((current: any, index: number) => index === existingIndex ? { ...current, qty: current.qty + item.qty } : current)
                       : [...sale.items, item];
-                    setSale({ ...sale, product_id: "", qty: 1, items: nextItems });
+                    setSale({ ...sale, product_id: "", variant_id: "", qty: 1, items: nextItems });
                   }}
                   className="rounded bg-espresso px-4 py-2 text-xs font-medium uppercase tracking-widest text-cream disabled:opacity-50"
                 >
@@ -138,12 +194,12 @@ function PosDashboard() {
                   {sale.items.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Aucun produit ajouté.</p>
                   ) : sale.items.map((item: any) => (
-                    <div key={item.product_id} className="flex items-center justify-between gap-3 rounded-xl bg-cream/70 p-3 text-sm">
+                    <div key={`${item.product_id}-${item.variant_id ?? "default"}`} className="flex items-center justify-between gap-3 rounded-xl bg-cream/70 p-3 text-sm">
                       <div>
-                        <strong>{item.qty} × {item.name}</strong>
+                        <strong>{item.qty} × {item.name}{item.variant_label ? ` (${item.variant_label})` : ""}</strong>
                         <div className="text-xs text-muted-foreground">{(item.price_fcfa * item.qty).toLocaleString("fr-FR")} FCFA · ${item.price_usd * item.qty}</div>
                       </div>
-                      <button type="button" onClick={() => setSale({ ...sale, items: sale.items.filter((current: any) => current.product_id !== item.product_id) })} className="rounded-full p-2 text-red-600 hover:bg-red-50">
+                      <button type="button" onClick={() => setSale({ ...sale, items: sale.items.filter((current: any) => !(current.product_id === item.product_id && current.variant_id === item.variant_id)) })} className="rounded-full p-2 text-red-600 hover:bg-red-50">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>

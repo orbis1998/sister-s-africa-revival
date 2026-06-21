@@ -2,6 +2,26 @@ import fs from "node:fs";
 import path from "node:path";
 import pg from "pg";
 
+function loadEnvFile() {
+  const envPath = path.resolve(".env");
+  if (!fs.existsSync(envPath)) return;
+  for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const idx = trimmed.indexOf("=");
+    if (idx === -1) continue;
+    const key = trimmed.slice(0, idx).trim();
+    if (process.env[key]) continue;
+    let val = trimmed.slice(idx + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    process.env[key] = val;
+  }
+}
+
+loadEnvFile();
+
 const url = process.env.DATABASE_URL;
 if (!url) {
   console.error("DATABASE_URL required");

@@ -97,6 +97,30 @@ async function assertProductEditor(ctx: { supabase: any; userId: string }) {
   if (!perms?.can_manage_products) throw new Error("Forbidden: gestion produits non autorisée");
 }
 
+async function assertStockEditor(ctx: { supabase: any; userId: string }, posId: string | null) {
+  const { data: isAdmin } = await ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" });
+  if (isAdmin) return;
+  const { data: perms } = await ctx.supabase
+    .from("manager_permissions")
+    .select("can_manage_stock, pos_ids")
+    .eq("user_id", ctx.userId)
+    .maybeSingle();
+  if (!perms?.can_manage_stock) throw new Error("Forbidden: gestion stock non autorisée");
+  if (!posId) throw new Error("Forbidden: stock central réservé à l'admin");
+  const allowed = (perms.pos_ids ?? []) as string[];
+  if (!allowed.includes(posId)) throw new Error("Forbidden: point de vente non autorisé");
+}
+
+type VariantInput = {
+  id?: string;
+  weight_value: number;
+  weight_unit: "g" | "kg";
+  price_usd: number;
+  price_fcfa: number;
+  sort_order?: number;
+  is_active?: boolean;
+};
+
 export const adminUpsertProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
@@ -104,13 +128,53 @@ export const adminUpsertProduct = createServerFn({ method: "POST" })
     seo_title?: string; seo_description?: string;
     price_usd: number; price_fcfa: number; quantity?: number; image_url?: string;
     is_active?: boolean; is_bestseller?: boolean;
+    variants?: VariantInput[];
   }) => d)
   .handler(async ({ data, context }) => {
     await assertProductEditor(context as any);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("products").upsert(data, { onConflict: "slug" });
+    const { variants, ...productPayload } = data;
+    const activeVariants = (variants ?? []).filter((v) => v.weight_value > 0);
+    if (activeVariants.length) {
+      const sorted = [...activeVariants].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      productPayload.price_usd = sorted[0].price_usd;
+      productPayload.price_fcfa = sorted[0].price_fcfa;
+    }
+    const { error } = await supabaseAdmin.from("products").upsert(productPayload, { onConflict: "slug" });
     if (error) throw new Error(error.message);
-    return { ok: true };
+
+    const { data: saved, error: fetchErr } = await supabaseAdmin
+      .from("products")
+      .select("id")
+      .eq("slug", productPayload.slug)
+      .single();
+    if (fetchErr || !saved) throw new Error(fetchErr?.message || "Produit introuvable après enregistrement");
+
+    if (variants) {
+      const { data: existing } = await supabaseAdmin.from("product_variants").select("id").eq("product_id", saved.id);
+      const keepIds = new Set(activeVariants.map((v) => v.id).filter(Boolean));
+      const toDelete = (existing ?? []).filter((row) => !keepIds.has(row.id)).map((row) => row.id);
+      if (toDelete.length) {
+        await supabaseAdmin.from("product_variants").delete().in("id", toDelete);
+      }
+      for (const [index, variant] of activeVariants.entries()) {
+        const row = {
+          id: variant.id,
+          product_id: saved.id,
+          weight_value: variant.weight_value,
+          weight_unit: variant.weight_unit,
+          price_usd: variant.price_usd,
+          price_fcfa: variant.price_fcfa,
+          sort_order: variant.sort_order ?? index,
+          is_active: variant.is_active ?? true,
+        };
+        const { error: variantErr } = variant.id
+          ? await supabaseAdmin.from("product_variants").update(row).eq("id", variant.id)
+          : await supabaseAdmin.from("product_variants").insert(row);
+        if (variantErr) throw new Error(variantErr.message);
+      }
+    }
+    return { ok: true, id: saved.id };
   });
 
 export const adminDeleteProduct = createServerFn({ method: "POST" })
@@ -127,16 +191,29 @@ export const adminSetStock = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { product_id: string; pos_id: string | null; quantity: number; low_stock_threshold?: number }) => d)
   .handler(async ({ data, context }) => {
-    await assertAdmin(context as any);
+    await assertStockEditor(context as any, data.pos_id);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: previous } = await supabaseAdmin
+      .from("stock")
+      .select("quantity")
+      .eq("product_id", data.product_id)
+      .eq("pos_id", data.pos_id)
+      .maybeSingle();
+    const previousQty = previous?.quantity ?? 0;
+    const delta = data.quantity - previousQty;
     const payload: any = { product_id: data.product_id, pos_id: data.pos_id, quantity: data.quantity };
     if (typeof data.low_stock_threshold === "number") payload.low_stock_threshold = data.low_stock_threshold;
     const { error } = await supabaseAdmin.from("stock").upsert(payload, { onConflict: "product_id,pos_id" });
     if (error) throw new Error(error.message);
-    await supabaseAdmin.from("stock_movements").insert({
-      product_id: data.product_id, pos_id: data.pos_id, delta: data.quantity,
-      reason: "Mise à jour manuelle", created_by: (context as any).userId,
-    });
+    if (delta !== 0) {
+      await supabaseAdmin.from("stock_movements").insert({
+        product_id: data.product_id,
+        pos_id: data.pos_id,
+        delta,
+        reason: "Mise à jour manuelle",
+        created_by: (context as any).userId,
+      });
+    }
     return { ok: true };
   });
 

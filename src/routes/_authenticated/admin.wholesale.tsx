@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { listWholesaleSales } from "@/lib/finance.functions";
-import { directionLabel, formatScopedMoney, STAFF_DIRECTIONS } from "@/lib/staff-scope";
+import { ADMIN_REPORT_REGIONS, directionLabel, formatScopedMoney } from "@/lib/staff-scope";
 
 export const Route = createFileRoute("/_authenticated/admin/wholesale")({
   component: WholesaleAdminPage,
@@ -21,10 +21,10 @@ function WholesaleAdminPage() {
     fcfa: sum.fcfa + Number(sale.total_fcfa ?? 0),
   }), { usd: 0, fcfa: 0 });
 
-  const byDirection = STAFF_DIRECTIONS.map((direction) => {
-    const rows = sales.filter((sale: any) => sale.city_scope === direction.value);
+  const byRegion = ADMIN_REPORT_REGIONS.map((region) => {
+    const rows = sales.filter((sale: any) => region.scopes.includes(sale.city_scope));
     return {
-      direction,
+      region,
       count: rows.length,
       usd: rows.reduce((sum: number, sale: any) => sum + Number(sale.total_usd ?? 0), 0),
       fcfa: rows.reduce((sum: number, sale: any) => sum + Number(sale.total_fcfa ?? 0), 0),
@@ -45,12 +45,15 @@ function WholesaleAdminPage() {
         <Stat label="Nombre de ventes" value={sales.length} />
       </div>
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-4">
-        {byDirection.map((row) => (
-          <div key={row.direction.value} className="rounded-2xl border border-border bg-card p-5">
-            <h2 className="font-display text-xl">{row.direction.label}</h2>
+      <div className="mt-8 grid gap-4 lg:grid-cols-3">
+        {byRegion.map((row) => (
+          <div key={row.region.key} className="rounded-2xl border border-border bg-card p-5">
+            <h2 className="font-display text-xl">{row.region.label}</h2>
             <div className="mt-3 text-sm text-muted-foreground">{row.count} vente(s)</div>
-            <div className="mt-2 font-medium text-copper">{formatScopedMoney({ total_usd: row.usd, total_fcfa: row.fcfa }, row.direction.value)}</div>
+            <div className="mt-2 space-y-1 text-sm">
+              <div className="font-medium text-copper">${row.usd.toFixed(2)}</div>
+              <div className="text-muted-foreground">{row.fcfa.toLocaleString("fr-FR")} FCFA</div>
+            </div>
           </div>
         ))}
       </div>

@@ -67,6 +67,7 @@ export function StaffShell({
     : primaryRole === "manager" ? [
       { to: "/manager", label: "Manager", icon: Briefcase, exact: true },
       { to: "/admin/products", label: "Produits", icon: Package, permissions: ["can_manage_products"] },
+      { to: "/admin/stock", label: "Stock", icon: Boxes, permissions: ["can_manage_stock"] },
       { to: "/admin/logistics", label: "Commandes", icon: ClipboardList, permissions: ["can_manage_orders", "can_manage_logistics"] },
       { to: "/admin/wholesale", label: "Vente en gros", icon: HandCoins },
     ]

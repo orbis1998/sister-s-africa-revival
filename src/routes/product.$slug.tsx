@@ -1,6 +1,7 @@
 import { createFileRoute, notFound, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { fetchProductBySlug, formatPrice, type Product } from "@/lib/products";
+import { useMemo, useState } from "react";
+import { fetchProductBySlug, formatPrice, type ProductWithVariants } from "@/lib/products";
+import { formatVariantLabel } from "@/lib/product-variants";
 import { useCart } from "@/lib/cart";
 import { ReviewForm } from "@/components/site/ReviewForm";
 import { Reviews } from "@/components/site/Reviews";
@@ -35,25 +36,42 @@ export const Route = createFileRoute("/product/$slug")({
 });
 
 function ProductPage() {
-  const { product } = Route.useLoaderData() as { product: Product };
+  const { product } = Route.useLoaderData() as { product: ProductWithVariants };
   const { add } = useCart();
   const [qty, setQty] = useState(1);
   const [reviewRefresh, setReviewRefresh] = useState(0);
+  const variants = product.variants.length
+    ? product.variants
+    : [{
+        id: product.id,
+        product_id: product.id,
+        weight_value: 1,
+        weight_unit: "kg" as const,
+        price_usd: product.price_usd,
+        price_fcfa: product.price_fcfa,
+        sort_order: 0,
+        is_active: true,
+      }];
+  const [selectedVariantId, setSelectedVariantId] = useState(variants[0].id);
+  const selectedVariant = useMemo(
+    () => variants.find((v) => v.id === selectedVariantId) ?? variants[0],
+    [variants, selectedVariantId],
+  );
 
   function addToCart() {
     add(
       {
         slug: product.slug,
         name: product.name,
-        variantId: product.id,
-        variantLabel: "Format standard",
-        priceFcfa: product.price_fcfa,
-        priceUsd: product.price_usd,
+        variantId: selectedVariant.id,
+        variantLabel: formatVariantLabel(selectedVariant.weight_value, selectedVariant.weight_unit),
+        priceFcfa: selectedVariant.price_fcfa,
+        priceUsd: selectedVariant.price_usd,
         image: product.image_url ?? "",
       },
       qty,
     );
-    toast.success(`${product.name} ajouté au panier`);
+    toast.success(`${product.name} (${formatVariantLabel(selectedVariant.weight_value, selectedVariant.weight_unit)}) ajouté au panier`);
   }
 
   return (
@@ -80,10 +98,43 @@ function ProductPage() {
           <h1 className="font-display text-5xl text-espresso mb-3">{product.name}</h1>
           {product.is_bestseller && <p className="text-muted-foreground mb-8">Best-seller The Sisters Africa</p>}
 
-          <div className="flex items-baseline gap-3 mb-8">
-            <span className="font-display text-4xl text-copper">${product.price_usd}</span>
-            <span className="text-sm text-muted-foreground">· {formatPrice(product.price_fcfa, product.price_usd).split(" · ")[0]}</span>
+          <div className="flex items-baseline gap-3 mb-6">
+            <span className="font-display text-4xl text-copper">${selectedVariant.price_usd}</span>
+            <span className="text-sm text-muted-foreground">· {formatPrice(selectedVariant.price_fcfa, selectedVariant.price_usd).split(" · ")[0]}</span>
           </div>
+
+          {variants.length > 1 && (
+            <div className="mb-8">
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Choisir le poids</div>
+              <div className="grid gap-2">
+                {variants.map((variant) => {
+                  const active = variant.id === selectedVariantId;
+                  return (
+                    <label
+                      key={variant.id}
+                      className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${
+                        active ? "border-copper bg-copper/10" : "border-border hover:border-copper/40"
+                      }`}
+                    >
+                      <span className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="variant"
+                          checked={active}
+                          onChange={() => setSelectedVariantId(variant.id)}
+                          className="accent-copper"
+                        />
+                        <span className="font-medium">{formatVariantLabel(variant.weight_value, variant.weight_unit)}</span>
+                      </span>
+                      <span className="text-sm text-copper">
+                        ${variant.price_usd} · {variant.price_fcfa.toLocaleString("fr-FR")} FCFA
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {(product.content_html || product.description) && (
             <div className="mb-8">

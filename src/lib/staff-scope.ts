@@ -51,3 +51,22 @@ export function formatScopedMoney(value: { total_usd?: number | null; total_fcfa
     ? `${Number(value.total_fcfa ?? 0).toLocaleString("fr-FR")} FCFA`
     : `$${Number(value.total_usd ?? 0).toFixed(2)}`;
 }
+
+/** Regroupement admin : Congo (Brazzaville + Pointe-Noire) sous « RD Congo ». */
+export const ADMIN_REPORT_REGIONS = [
+  { key: "kinshasa", label: "Kinshasa", scopes: ["kinshasa"] as StaffDirection[] },
+  { key: "katanga", label: "Katanga", scopes: ["katanga"] as StaffDirection[] },
+  { key: "rd-congo", label: "RD Congo", scopes: ["brazzaville", "pointe-noire"] as StaffDirection[] },
+] as const;
+
+export function regionLabelForScope(scope?: string | null) {
+  const region = ADMIN_REPORT_REGIONS.find((r) => r.scopes.includes(scope as StaffDirection));
+  return region?.label ?? directionLabel(scope);
+}
+
+export function aggregateByAdminRegion<T extends { city_scope?: string | null }>(rows: T[]) {
+  return ADMIN_REPORT_REGIONS.map((region) => ({
+    region,
+    rows: rows.filter((row) => region.scopes.includes(row.city_scope as StaffDirection)),
+  }));
+}
