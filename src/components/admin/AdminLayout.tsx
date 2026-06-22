@@ -12,6 +12,7 @@ type PermissionKey =
   | "can_manage_orders"
   | "can_manage_logistics"
   | "can_view_accounting"
+  | "can_record_wholesale"
   | "can_manage_pos"
   | "can_manage_users";
 type NavLink = { to: string; label: string; icon: any; exact?: boolean; permissions?: PermissionKey[] };
@@ -69,7 +70,7 @@ export function StaffShell({
       { to: "/admin/products", label: "Produits", icon: Package, permissions: ["can_manage_products"] },
       { to: "/admin/stock", label: "Stock", icon: Boxes, permissions: ["can_manage_stock"] },
       { to: "/admin/logistics", label: "Commandes", icon: ClipboardList, permissions: ["can_manage_orders", "can_manage_logistics"] },
-      { to: "/admin/wholesale", label: "Vente en gros", icon: HandCoins },
+      { to: "/admin/wholesale", label: "Vente en gros", icon: HandCoins, permissions: ["can_view_accounting", "can_record_wholesale"] },
     ]
     : primaryRole === "pos" ? [{ to: "/pos", label: "POS", icon: ShoppingCart, exact: true }]
     : [{ to: "/livreur", label: "Livreur", icon: Truck, exact: true }];

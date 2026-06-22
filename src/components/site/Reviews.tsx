@@ -1,61 +1,31 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Star } from "lucide-react";
+import { getPublicReviews } from "@/lib/reviews.functions";
+import type { PublicReview } from "@/lib/reviews";
 
-interface Review {
-  id: string;
-  author_name: string;
-  rating: number;
-  comment: string;
-  location: string | null;
-  before_image_url: string | null;
-  after_image_url: string | null;
-  created_at: string;
-  approved?: boolean | null;
-}
-
-export function Reviews({ productSlug, refreshKey }: { productSlug: string; refreshKey: number }) {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadReviews() {
-      setLoading(true);
-      let result = await supabase
-        .from("reviews")
-        .select("*")
-        .eq("product_slug", productSlug)
-        .eq("approved", true)
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (result.error) {
-        result = await supabase
-          .from("reviews")
-          .select("*")
-          .eq("product_slug", productSlug)
-          .order("created_at", { ascending: false })
-          .limit(50);
-      }
-
-      const safeReviews = ((result.data as Review[]) ?? []).filter((review) => review.approved !== false);
-      if (!cancelled) {
-        setReviews(safeReviews);
-        setLoading(false);
-      }
-    }
-    loadReviews();
-    return () => {
-      cancelled = true;
-    };
-  }, [productSlug, refreshKey]);
+export function Reviews({
+  productSlug,
+  refreshKey,
+  initialReviews = [],
+}: {
+  productSlug: string;
+  refreshKey: number;
+  initialReviews?: PublicReview[];
+}) {
+  const getReviews = useServerFn(getPublicReviews);
+  const { data: reviews = initialReviews, isLoading } = useQuery({
+    queryKey: ["public-reviews", productSlug, refreshKey],
+    queryFn: () => getReviews({ data: { productSlug, limit: 50 } }),
+    initialData: refreshKey === 0 ? initialReviews : undefined,
+    staleTime: 60_000,
+  });
 
   const avg = reviews.length
     ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
     : 0;
 
-  if (loading) {
+  if (isLoading && reviews.length === 0) {
     return <div className="text-sm text-muted-foreground">Chargement des avis…</div>;
   }
 
@@ -101,7 +71,7 @@ export function Reviews({ productSlug, refreshKey }: { productSlug: string; refr
                   />
                 ))}
               </div>
-              <p className="text-sm text-espresso/85 leading-relaxed mb-4 italic">"{r.comment}"</p>
+              <p className="text-sm text-espresso/85 leading-relaxed mb-4 italic">&quot;{r.comment}&quot;</p>
               {(r.before_image_url || r.after_image_url) && (
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   {r.before_image_url && (

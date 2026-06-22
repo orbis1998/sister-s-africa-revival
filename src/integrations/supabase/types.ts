@@ -645,6 +645,7 @@ export type Database = {
           product_id: string
           quantity: number
           updated_at: string
+          variant_id: string
         }
         Insert: {
           id?: string
@@ -653,6 +654,7 @@ export type Database = {
           product_id: string
           quantity?: number
           updated_at?: string
+          variant_id: string
         }
         Update: {
           id?: string
@@ -661,6 +663,7 @@ export type Database = {
           product_id?: string
           quantity?: number
           updated_at?: string
+          variant_id?: string
         }
         Relationships: [
           {
@@ -688,6 +691,7 @@ export type Database = {
           pos_id: string | null
           product_id: string
           reason: string | null
+          variant_id: string | null
         }
         Insert: {
           created_at?: string
@@ -697,6 +701,7 @@ export type Database = {
           pos_id?: string | null
           product_id: string
           reason?: string | null
+          variant_id?: string | null
         }
         Update: {
           created_at?: string
@@ -706,6 +711,7 @@ export type Database = {
           pos_id?: string | null
           product_id?: string
           reason?: string | null
+          variant_id?: string | null
         }
         Relationships: [
           {

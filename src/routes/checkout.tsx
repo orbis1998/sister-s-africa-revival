@@ -1,15 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/lib/cart";
 import { countries, findCountry } from "@/lib/locations";
 import { formatDeliveryFeeByCountry } from "@/lib/staff-scope";
+import { formatCheckoutCollect, formatLineTotal, productUnitPrice, type MarketCountry } from "@/lib/market";
+import { useMarket } from "@/lib/market-context";
 import { MessageCircle, Loader2 } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { createOrder } from "@/lib/orders.functions";
 import { lookupCommuneDeliveryFee } from "@/lib/delivery.functions";
-import { orderCollectTotal } from "@/lib/seo";
 import { buildSeoMeta } from "@/lib/seo";
 
 export const Route = createFileRoute("/checkout")({
@@ -43,7 +44,8 @@ function tomorrowInputDate() {
 }
 
 function CheckoutPage() {
-  const { items, totalFcfa, totalUsd, clear } = useCart();
+  const { items, totalFcfa, totalUsd, totalCdf, clear } = useCart();
+  const { countryCode: marketCountry, setCountry: setMarketCountry, ready: marketReady } = useMarket();
   const navigate = useNavigate();
   const placeOrder = useServerFn(createOrder);
   const lookupFee = useServerFn(lookupCommuneDeliveryFee);
@@ -64,13 +66,28 @@ function CheckoutPage() {
   });
 
   const country = useMemo(() => findCountry(form.countryCode)!, [form.countryCode]);
-  const cityObj = country.cities.find((c) => c.name === form.city);
-  const totals = orderCollectTotal({
-    total_fcfa: totalFcfa,
-    total_usd: totalUsd,
-    delivery_fee_fcfa: deliveryFee.fee_fcfa,
-    delivery_fee_usd: deliveryFee.fee_usd,
-  });
+  const market = form.countryCode as MarketCountry;
+  const pricingItems = items.map((it) => ({
+    ...it,
+    price_usd: it.priceUsd,
+    price_fcfa: it.priceFcfa,
+    price_cdf: it.priceCdf,
+    rdc_price_currency: it.rdcCurrency,
+    variantLabel: it.variantLabel,
+  }));
+  const collect = formatCheckoutCollect(pricingItems, market, deliveryFee.fee_fcfa);
+
+  const marketSynced = useRef(false);
+
+  useEffect(() => {
+    setMarketCountry(form.countryCode, "checkout");
+  }, [form.countryCode, setMarketCountry]);
+
+  useEffect(() => {
+    if (!marketReady || marketSynced.current) return;
+    marketSynced.current = true;
+    setForm((f) => ({ ...f, countryCode: marketCountry }));
+  }, [marketReady, marketCountry]);
 
   useEffect(() => {
     if (!form.city || !form.commune) {
@@ -85,6 +102,8 @@ function CheckoutPage() {
       .finally(() => { if (!cancelled) setFeeLoading(false); });
     return () => { cancelled = true; };
   }, [form.countryCode, form.city, form.commune, lookupFee]);
+
+  const cityObj = country.cities.find((c) => c.name === form.city);
 
   function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -122,9 +141,9 @@ function CheckoutPage() {
         notes: parsed.data.notes,
         items: items.map((it) => ({
           slug: it.slug, name: it.name, variantId: it.variantId, variantLabel: it.variantLabel,
-          qty: it.qty, priceUsd: it.priceUsd, priceFcfa: it.priceFcfa,
+          qty: it.qty, priceUsd: it.priceUsd, priceFcfa: it.priceFcfa, priceCdf: it.priceCdf, rdcCurrency: it.rdcCurrency,
         })),
-        total_fcfa: totalFcfa,
+        total_fcfa: market === "CG" ? totalFcfa : totalCdf,
         total_usd: totalUsd,
         delivery_fee_fcfa: deliveryFee.fee_fcfa,
         delivery_fee_usd: deliveryFee.fee_usd,
@@ -151,17 +170,11 @@ function CheckoutPage() {
     if (parsed.data.notes) lines.push(`• Notes : ${parsed.data.notes}`);
     lines.push("");
     lines.push("*Articles*");
-    items.forEach((it) => {
-      lines.push(
-        `• ${it.qty} × ${it.name} — ${it.variantLabel}  (${(it.priceFcfa * it.qty).toLocaleString("fr-FR")} FCFA / $${it.priceUsd * it.qty})`,
-      );
-    });
+    collect.whatsappProductsLines.forEach((line) => lines.push(line));
     lines.push("");
-    lines.push(`*Sous-total produits : ${totalFcfa.toLocaleString("fr-FR")} FCFA · $${totalUsd}*`);
-    if (deliveryFee.fee_fcfa) {
-      lines.push(`*Frais livraison (${parsed.data.commune}) : ${formatDeliveryFeeByCountry(deliveryFee.fee_fcfa, country.code)}*`);
-    }
-    lines.push(`*Total à encaisser : ${totals.collect_fcfa.toLocaleString("fr-FR")} FCFA · $${totals.collect_usd}*`);
+    lines.push(collect.whatsappSubtotal);
+    if (collect.whatsappDelivery) lines.push(collect.whatsappDelivery);
+    lines.push(collect.whatsappTotal);
 
     const message = encodeURIComponent(lines.join("\n"));
     const whatsappNumber = cityObj?.whatsapp ?? country.whatsapp;
@@ -303,32 +316,35 @@ function CheckoutPage() {
         <aside className="bg-card border border-border rounded-sm p-8 h-fit lg:sticky lg:top-28">
           <h2 className="font-display text-xl text-espresso mb-6">Récapitulatif</h2>
           <div className="space-y-3 mb-6 pb-6 border-b border-border max-h-64 overflow-auto">
-            {items.map((it) => (
-              <div key={`${it.slug}-${it.variantId}`} className="flex justify-between text-sm gap-4">
-                <span className="text-espresso/80">{it.qty} × {it.name} <span className="text-muted-foreground">({it.variantLabel})</span></span>
-                <span className="text-espresso shrink-0">${it.priceUsd * it.qty}</span>
-              </div>
-            ))}
+            {items.map((it) => {
+              const unit = pricingItems.find((p) => p.slug === it.slug && p.variantId === it.variantId)!;
+              const { amount, label } = productUnitPrice(unit, market);
+              return (
+                <div key={`${it.slug}-${it.variantId}`} className="flex justify-between text-sm gap-4">
+                  <span className="text-espresso/80">{it.qty} × {it.name} <span className="text-muted-foreground">({it.variantLabel})</span></span>
+                  <span className="text-espresso shrink-0">{formatLineTotal(amount, label, it.qty)}</span>
+                </div>
+              );
+            })}
           </div>
           <div className="space-y-2 mb-6 pb-6 border-b border-border">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Sous-total produits</span>
-              <span>${totalUsd} · {totalFcfa.toLocaleString("fr-FR")} FCFA</span>
+              <span>{collect.productsLabel}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Frais livraison{form.commune ? ` (${form.commune})` : ""}</span>
-              <span>{feeLoading ? "…" : formatDeliveryFeeByCountry(deliveryFee.fee_fcfa, form.countryCode)}</span>
+              <span>{feeLoading ? "…" : collect.deliveryLabel}</span>
             </div>
           </div>
           <div className="flex justify-between items-baseline mb-6">
             <span className="font-display text-lg text-espresso">Total à payer</span>
-            <div className="text-right">
-              <div className="font-display text-2xl text-copper">${totals.collect_usd}</div>
-              <div className="text-xs text-muted-foreground">{totals.collect_fcfa.toLocaleString("fr-FR")} FCFA</div>
-            </div>
+            <div className="text-right font-display text-2xl text-copper">{collect.totalLabel}</div>
           </div>
           <p className="mb-4 text-[11px] text-muted-foreground">
-            Le solde produits ({totalFcfa.toLocaleString("fr-FR")} FCFA) est séparé des frais livraison pour la comptabilité interne.
+            {market === "CD"
+              ? "RDC : produits en USD ou CDF selon l'article, livraison en CDF. Pas de conversion automatique."
+              : "Congo : produits et livraison en FCFA."}
           </p>
           <button type="submit" disabled={submitting || items.length === 0} className="btn-hero w-full disabled:opacity-50">
             {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Redirection…</> : <><MessageCircle className="w-4 h-4" /> Commander par WhatsApp</>}

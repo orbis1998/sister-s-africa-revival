@@ -10,7 +10,7 @@ export interface Country {
   name: string;
   whatsapp: string; // E.164 without +
   whatsappDisplay: string;
-  currency: "FCFA" | "FCFA";
+  currency: "USD" | "FCFA";
   cities: City[];
 }
 
@@ -20,7 +20,7 @@ export const countries: Country[] = [
     name: "République Démocratique du Congo",
     whatsapp: "243994186790",
     whatsappDisplay: "+243 994 186 790",
-    currency: "FCFA",
+    currency: "USD",
     cities: [
       {
         name: "Kinshasa",

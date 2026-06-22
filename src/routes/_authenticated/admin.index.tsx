@@ -64,6 +64,10 @@ function AdminDashboard() {
   const { data: products } = useQuery({
     queryKey: ["admin-products"], queryFn: async () => (await supabase.from("products").select("id, price_usd, price_fcfa")).data ?? [],
   });
+  const { data: variants } = useQuery({
+    queryKey: ["admin-dashboard-variants"],
+    queryFn: async () => (await supabase.from("product_variants").select("id, price_usd, price_fcfa")).data ?? [],
+  });
   const { data: pos } = useQuery({
     queryKey: ["admin-pos"], queryFn: async () => (await supabase.from("points_of_sale").select("id, city")).data ?? [],
   });
@@ -125,15 +129,18 @@ function AdminDashboard() {
   });
 
   const posStockValue = useMemo(() => {
+    const variantById = Object.fromEntries((variants ?? []).map((v: any) => [v.id, v]));
     return (stock ?? []).reduce((sum: { usd: number; fcfa: number }, row: any) => {
+      const variant = variantById[row.variant_id];
       const product = (products ?? []).find((p: any) => p.id === row.product_id);
-      if (!product) return sum;
+      const priceUsd = variant?.price_usd ?? product?.price_usd ?? 0;
+      const priceFcfa = variant?.price_fcfa ?? product?.price_fcfa ?? 0;
       return {
-        usd: sum.usd + Number(product.price_usd ?? 0) * Number(row.quantity ?? 0),
-        fcfa: sum.fcfa + Number(product.price_fcfa ?? 0) * Number(row.quantity ?? 0),
+        usd: sum.usd + Number(priceUsd) * Number(row.quantity ?? 0),
+        fcfa: sum.fcfa + Number(priceFcfa) * Number(row.quantity ?? 0),
       };
     }, { usd: 0, fcfa: 0 });
-  }, [stock, products]);
+  }, [stock, products, variants]);
 
   async function downloadReport(format: "csv" | "pdf") {
     try {

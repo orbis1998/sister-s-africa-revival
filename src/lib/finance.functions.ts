@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { StaffDirection } from "@/lib/staff-scope";
+import { directionCurrency } from "@/lib/staff-scope";
+import { assertWholesaleAccess, resolvePosForOrder } from "@/lib/pos-scope";
 
 async function getRoles(ctx: { supabase: any; userId: string }) {
   const { data } = await ctx.supabase.from("user_roles").select("role").eq("user_id", ctx.userId);
@@ -88,16 +90,20 @@ export const createWholesaleSale = createServerFn({ method: "POST" })
     const roles = await getRoles(ctx);
     if (!roles.some((role: string) => ["admin", "manager"].includes(role))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await assertWholesaleAccess(supabaseAdmin, ctx.userId, roles);
     const profileScope = await getProfileScope(supabaseAdmin, ctx.userId);
     const cityScope = roles.includes("admin") ? data.city_scope || profileScope : profileScope;
     if (!cityScope) throw new Error("Direction manquante");
 
     const quantity = Math.max(1, Number(data.quantity || 1));
-    const unitUsd = Number(data.unit_price_usd ?? 0);
-    const unitFcfa = Number(data.unit_price_fcfa ?? 0);
+    const isFcfa = directionCurrency(cityScope) === "FCFA";
+    const unitUsd = isFcfa ? 0 : Number(data.unit_price_usd ?? 0);
+    const unitFcfa = isFcfa ? Number(data.unit_price_fcfa ?? 0) : 0;
+    const pos_id = await resolvePosForOrder(supabaseAdmin, cityScope, roles.includes("admin") ? null : ctx.userId);
     const { error } = await supabaseAdmin.from("wholesale_sales").insert({
       created_by: ctx.userId,
       city_scope: cityScope,
+      pos_id,
       customer_name: data.customer_name.trim(),
       customer_phone: data.customer_phone?.trim() || null,
       product_id: data.product_id || null,
@@ -122,6 +128,7 @@ export const listWholesaleSales = createServerFn({ method: "GET" })
     const roles = await getRoles(ctx);
     if (!roles.some((role: string) => ["admin", "manager"].includes(role))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (!roles.includes("admin")) await assertWholesaleAccess(supabaseAdmin, ctx.userId, roles);
     let q = supabaseAdmin
       .from("wholesale_sales")
       .select("*, profiles:created_by(full_name, badge_id)")

@@ -1,5 +1,7 @@
 export type WeightUnit = "g" | "kg";
 
+import type { RdcPriceCurrency } from "@/lib/market";
+
 export type ProductVariant = {
   id: string;
   product_id: string;
@@ -7,6 +9,8 @@ export type ProductVariant = {
   weight_unit: WeightUnit;
   price_usd: number;
   price_fcfa: number;
+  price_cdf: number;
+  rdc_price_currency: RdcPriceCurrency;
   sort_order: number;
   is_active: boolean;
 };

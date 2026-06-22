@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { directionFromCity } from "@/lib/staff-scope";
+import { resolvePosForOrder } from "@/lib/pos-scope";
+import { assertOrderStockAvailable } from "@/lib/stock.functions";
 
 type Status = "received" | "preparing" | "ready" | "en_route" | "delivered" | "cancelled";
 
@@ -42,6 +44,8 @@ export const createOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const city_scope = directionFromCity(data.city, data.country_code);
+    const pos_id = await resolvePosForOrder(supabaseAdmin, city_scope);
+    await assertOrderStockAvailable(supabaseAdmin, pos_id, data.items);
     const { data: row, error } = await supabaseAdmin.from("orders").insert({
       customer_name: data.customer_name,
       customer_phone: data.customer_phone,
@@ -49,6 +53,7 @@ export const createOrder = createServerFn({ method: "POST" })
       country_name: data.country_name,
       city: data.city,
       city_scope,
+      pos_id,
       commune: data.commune,
       address: data.address,
       delivery_date: data.delivery_date ?? null,
@@ -83,6 +88,7 @@ export const createStaffOrder = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await ensureManagerOrderAccess(supabaseAdmin, roles, ctx.userId);
     const city_scope = directionFromCity(data.city, data.country_code);
+    const pos_id = await resolvePosForOrder(supabaseAdmin, city_scope, ctx.userId);
 
     if (!roles.includes("admin")) {
       const scope = await getProfileScope(supabaseAdmin, ctx.userId);
@@ -93,6 +99,8 @@ export const createStaffOrder = createServerFn({ method: "POST" })
       }
     }
 
+    await assertOrderStockAvailable(supabaseAdmin, pos_id, data.items?.length ? data.items : []);
+
     const { data: row, error } = await supabaseAdmin.from("orders").insert({
       customer_name: data.customer_name,
       customer_phone: data.customer_phone,
@@ -100,6 +108,7 @@ export const createStaffOrder = createServerFn({ method: "POST" })
       country_name: data.country_name,
       city: data.city,
       city_scope,
+      pos_id,
       commune: data.commune,
       address: data.address,
       delivery_date: data.delivery_date ?? null,
@@ -207,5 +216,12 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     if (data.status === "delivered") patch.delivered_at = new Date().toISOString();
     const { error } = await supabaseAdmin.from("orders").update(patch).eq("id", data.order_id);
     if (error) throw new Error(error.message);
+    if (data.status === "delivered") {
+      const { error: stockErr } = await supabaseAdmin.rpc("record_order_delivery_stock", {
+        p_order_id: data.order_id,
+        p_actor: ctx.userId,
+      });
+      if (stockErr) throw new Error(stockErr.message);
+    }
     return { ok: true };
   });

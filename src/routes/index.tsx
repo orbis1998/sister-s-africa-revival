@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import heroImg from "@/assets/hero.jpg";
 import { fetchFeaturedProducts } from "@/lib/products";
+import { fetchApprovedReviews, type PublicReview } from "@/lib/reviews";
 import { defaultSiteSettings, fetchSiteSettings, type SiteSettings } from "@/lib/site-settings";
 import { ProductCard } from "@/components/site/ProductCard";
-import { supabase } from "@/integrations/supabase/client";
 import { ArrowRight, Leaf, ShieldCheck, Truck, HeartHandshake, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")({
   }),
   loader: async () => {
     try {
-      const [products, settings] = await Promise.all([
+      const [products, settings, reviews] = await Promise.all([
         fetchFeaturedProducts().catch((error) => {
           console.error("Featured products loader failed", error);
           return [];
@@ -27,18 +27,22 @@ export const Route = createFileRoute("/")({
           console.error("Site settings loader failed", error);
           return defaultSiteSettings;
         }),
+        fetchApprovedReviews({ limit: 4 }).catch((error) => {
+          console.error("Home reviews loader failed", error);
+          return [];
+        }),
       ]);
-      return { products, settings };
+      return { products, settings, reviews };
     } catch (error) {
       console.error("Home loader failed", error);
-      return { products: [], settings: defaultSiteSettings };
+      return { products: [], settings: defaultSiteSettings, reviews: [] };
     }
   },
   component: HomePage,
 });
 
 function HomePage() {
-  const { products, settings } = Route.useLoaderData();
+  const { products, settings, reviews } = Route.useLoaderData();
 
   return (
     <>
@@ -150,7 +154,7 @@ function HomePage() {
         </div>
       </section>
 
-      <HomeReviews />
+      <HomeReviews reviews={reviews} />
 
       {/* CTA */}
       <section className="container-page py-24 text-center">
@@ -167,50 +171,7 @@ function HomePage() {
   );
 }
 
-interface HomeReview {
-  id: string;
-  author_name: string;
-  rating: number;
-  comment: string;
-  location: string | null;
-  approved?: boolean | null;
-}
-
-function HomeReviews() {
-  const [reviews, setReviews] = useState<HomeReview[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadReviews() {
-      setLoading(true);
-      let result = await supabase
-        .from("reviews")
-        .select("id, author_name, rating, comment, location, approved")
-        .eq("approved", true)
-        .order("created_at", { ascending: false })
-        .limit(4);
-
-      if (result.error) {
-        result = await supabase
-          .from("reviews")
-          .select("id, author_name, rating, comment, location")
-          .order("created_at", { ascending: false })
-          .limit(4);
-      }
-
-      const safeReviews = ((result.data as HomeReview[]) ?? []).filter((review) => review.approved !== false);
-      if (!cancelled) {
-        setReviews(safeReviews);
-        setLoading(false);
-      }
-    }
-    loadReviews();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+function HomeReviews({ reviews }: { reviews: PublicReview[] }) {
   return (
     <section className="container-page py-24">
       <div className="mb-12 max-w-2xl">
@@ -220,11 +181,7 @@ function HomeReviews() {
           Chaque témoignage publié a été vérifié par notre équipe avant d'apparaître ici.
         </p>
       </div>
-      {loading ? (
-        <div className="rounded-2xl border border-border bg-card p-8 text-sm text-muted-foreground">
-          Chargement des avis clientes...
-        </div>
-      ) : reviews.length === 0 ? (
+      {reviews.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card p-8 text-sm text-muted-foreground">
           Aucun avis validé pour le moment. Les témoignages apparaîtront ici après validation par l'administration.
         </div>
@@ -237,7 +194,7 @@ function HomeReviews() {
                   <Star key={n} className={`h-4 w-4 ${n <= review.rating ? "fill-gold text-gold" : "text-border"}`} />
                 ))}
               </div>
-              <p className="text-sm leading-relaxed text-espresso/80 italic">"{review.comment}"</p>
+              <p className="text-sm leading-relaxed text-espresso/80 italic">&quot;{review.comment}&quot;</p>
               <div className="mt-5 text-xs uppercase tracking-[0.18em] text-muted-foreground">
                 {review.author_name}{review.location ? ` · ${review.location}` : ""}
               </div>

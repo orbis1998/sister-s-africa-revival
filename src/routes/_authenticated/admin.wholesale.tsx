@@ -32,7 +32,7 @@ function WholesaleAdminPage() {
   });
 
   return (
-    <StaffShell title="Administration" requiredRole={["admin", "manager"]}>
+    <StaffShell title="Administration" requiredRole={["admin", "manager"]} requiredPermission={["can_view_accounting", "can_record_wholesale"]}>
       <span className="eyebrow">Commercial</span>
       <h1 className="font-display text-4xl mt-2">Ventes en gros</h1>
       <p className="mt-2 text-sm text-muted-foreground">

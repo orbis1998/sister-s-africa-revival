@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { fetchProducts } from "@/lib/products";
+import { fetchProducts, type ProductWithVariants } from "@/lib/products";
 import { ProductCard } from "@/components/site/ProductCard";
 
 export const Route = createFileRoute("/products")({
@@ -11,7 +11,7 @@ export const Route = createFileRoute("/products")({
       { property: "og:description", content: "Bouillies bio d'origine végétale pour adultes et enfants." },
     ],
   }),
-  loader: async () => {
+  loader: async (): Promise<ProductWithVariants[]> => {
     try {
       return await fetchProducts();
     } catch (error) {
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/products")({
 });
 
 function ProductsPage() {
-  const products = Route.useLoaderData();
+  const products = Route.useLoaderData() as ProductWithVariants[];
 
   return (
     <section className="container-page py-20">
@@ -41,8 +41,8 @@ function ProductsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          {products.map((p) => (
-            <ProductCard key={p.slug} product={p} />
+          {products.map((product) => (
+            <ProductCard key={product.slug} product={product} />
           ))}
         </div>
       )}

@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { createStaffExpense, createWholesaleSale, listStaffExpenses, listWholesaleSales } from "@/lib/finance.functions";
 import { listCommuneDeliveryFees, upsertCommuneDeliveryFees } from "@/lib/delivery.functions";
-import { directionLabel, formatScopedMoney, directionDeliveryCurrency } from "@/lib/staff-scope";
+import { directionLabel, formatScopedMoney, directionDeliveryCurrency, directionCurrency } from "@/lib/staff-scope";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -40,6 +40,13 @@ function ManagerDashboard() {
     queryFn: async () => user ? (await supabase.from("profiles").select("city_scope").eq("id", user.id).maybeSingle()).data : null,
     enabled: !!user,
   });
+  const { data: managerPerms } = useQuery({
+    queryKey: ["manager-perms", user?.id],
+    enabled: !!user,
+    queryFn: async () => (await supabase.from("manager_permissions").select("*").eq("user_id", user!.id).maybeSingle()).data,
+  });
+  const canWholesale = !!(managerPerms?.can_view_accounting && managerPerms?.can_record_wholesale);
+  const priceCurrency = directionCurrency(profile?.city_scope);
   const { data: expenses = [] } = useQuery({
     queryKey: ["manager-expenses"],
     queryFn: () => listExpenses({}),
@@ -51,6 +58,7 @@ function ManagerDashboard() {
   const { data: wholesaleSales = [] } = useQuery({
     queryKey: ["manager-wholesale-sales"],
     queryFn: () => listWholesale({}),
+    enabled: canWholesale,
   });
   const { data: deliveryFees = [], refetch: refetchFees } = useQuery({
     queryKey: ["manager-delivery-fees", profile?.city_scope],
@@ -169,11 +177,15 @@ function ManagerDashboard() {
         </div>
         <div className="rounded-2xl border border-border bg-card p-6">
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Ventes en gros du mois</div>
-          <div className="font-display text-4xl mt-2">{formatScopedMoney({ total_usd: monthWholesale.usd, total_fcfa: monthWholesale.fcfa }, profile?.city_scope)}</div>
+          <div className="font-display text-4xl mt-2">
+            {canWholesale
+              ? formatScopedMoney({ total_usd: monthWholesale.usd, total_fcfa: monthWholesale.fcfa }, profile?.city_scope)
+              : "—"}
+          </div>
         </div>
         <div className="rounded-2xl border border-border bg-card p-6">
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Nombre ventes en gros</div>
-          <div className="font-display text-4xl mt-2">{wholesaleSales.length}</div>
+          <div className="font-display text-4xl mt-2">{canWholesale ? wholesaleSales.length : "—"}</div>
         </div>
       </div>
 
@@ -216,10 +228,13 @@ function ManagerDashboard() {
         </button>
       </div>
 
+      {canWholesale && (
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-2xl border border-border bg-card p-6">
           <h2 className="font-display text-2xl">Vente en gros</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Le prix est fixé manuellement pour chaque vente.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Prix en <strong>{priceCurrency}</strong> uniquement pour votre direction.
+          </p>
           <div className="mt-5 grid gap-3">
             <input placeholder="Nom du client / revendeur" value={wholesale.customer_name} onChange={(e) => setWholesale({ ...wholesale, customer_name: e.target.value })} className="input-admin" />
             <input placeholder="Téléphone" value={wholesale.customer_phone} onChange={(e) => setWholesale({ ...wholesale, customer_phone: e.target.value })} className="input-admin" />
@@ -233,10 +248,13 @@ function ManagerDashboard() {
             {!wholesale.product_id && (
               <input placeholder="Produit vendu" value={wholesale.product_name} onChange={(e) => setWholesale({ ...wholesale, product_name: e.target.value })} className="input-admin" />
             )}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <input type="number" min={1} placeholder="Qté" value={wholesale.quantity} onChange={(e) => setWholesale({ ...wholesale, quantity: e.target.value })} className="input-admin" />
-              <input type="number" min={0} step="0.01" placeholder="Prix USD" value={wholesale.unit_price_usd} onChange={(e) => setWholesale({ ...wholesale, unit_price_usd: e.target.value })} className="input-admin" />
-              <input type="number" min={0} placeholder="Prix FCFA" value={wholesale.unit_price_fcfa} onChange={(e) => setWholesale({ ...wholesale, unit_price_fcfa: e.target.value })} className="input-admin" />
+              {priceCurrency === "FCFA" ? (
+                <input type="number" min={0} placeholder="Prix unitaire FCFA" value={wholesale.unit_price_fcfa} onChange={(e) => setWholesale({ ...wholesale, unit_price_fcfa: e.target.value, unit_price_usd: "" })} className="input-admin" />
+              ) : (
+                <input type="number" min={0} step="0.01" placeholder="Prix unitaire USD" value={wholesale.unit_price_usd} onChange={(e) => setWholesale({ ...wholesale, unit_price_usd: e.target.value, unit_price_fcfa: "" })} className="input-admin" />
+              )}
             </div>
             <select value={wholesale.payment_status} onChange={(e) => setWholesale({ ...wholesale, payment_status: e.target.value })} className="input-admin">
               <option value="pending">En attente</option>
@@ -274,13 +292,17 @@ function ManagerDashboard() {
           </div>
         </div>
       </div>
+      )}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-2xl border border-border bg-card p-6">
           <h2 className="font-display text-2xl">Signaler une dépense</h2>
           <div className="mt-5 grid gap-3">
-            <input type="number" min={0} step="0.01" placeholder="Montant USD" value={expense.amount_usd} onChange={(e) => setExpense({ ...expense, amount_usd: e.target.value })} className="input-admin" />
-            <input type="number" min={0} placeholder="Montant FCFA" value={expense.amount_fcfa} onChange={(e) => setExpense({ ...expense, amount_fcfa: e.target.value })} className="input-admin" />
+            {priceCurrency === "FCFA" ? (
+              <input type="number" min={0} placeholder="Montant FCFA" value={expense.amount_fcfa} onChange={(e) => setExpense({ ...expense, amount_fcfa: e.target.value, amount_usd: "" })} className="input-admin" />
+            ) : (
+              <input type="number" min={0} step="0.01" placeholder="Montant USD" value={expense.amount_usd} onChange={(e) => setExpense({ ...expense, amount_usd: e.target.value, amount_fcfa: "" })} className="input-admin" />
+            )}
             <textarea placeholder="Note / justification" value={expense.note} onChange={(e) => setExpense({ ...expense, note: e.target.value })} className="input-admin resize-none" rows={4} />
             <button disabled={expenseMut.isPending || !expense.note.trim()} onClick={() => expenseMut.mutate()} className="btn-hero disabled:opacity-50">
               {expenseMut.isPending ? "Enregistrement..." : "Enregistrer la dépense"}

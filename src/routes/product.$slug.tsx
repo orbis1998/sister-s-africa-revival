@@ -1,7 +1,11 @@
 import { createFileRoute, notFound, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { fetchProductBySlug, formatPrice, type ProductWithVariants } from "@/lib/products";
-import { formatVariantLabel } from "@/lib/product-variants";
+import { useEffect, useMemo, useState } from "react";
+import { fetchProductBySlug, type ProductWithVariants } from "@/lib/products";
+import { fetchApprovedReviews } from "@/lib/reviews";
+import { formatVariantLabel, type ProductVariant } from "@/lib/product-variants";
+import { formatLineTotal, formatProductPrice, productUnitPrice, rdcCurrencyOf } from "@/lib/market";
+import { useMarket } from "@/lib/market-context";
+import { useMarketStock } from "@/lib/use-market-stock";
 import { useCart } from "@/lib/cart";
 import { ReviewForm } from "@/components/site/ReviewForm";
 import { Reviews } from "@/components/site/Reviews";
@@ -24,7 +28,11 @@ export const Route = createFileRoute("/product/$slug")({
   loader: async ({ params }) => {
     const product = await fetchProductBySlug(params.slug);
     if (!product) throw notFound();
-    return { product };
+    const reviews = await fetchApprovedReviews({ productSlug: params.slug, limit: 50 }).catch((error) => {
+      console.error("Product reviews loader failed", error);
+      return [];
+    });
+    return { product, reviews };
   },
   notFoundComponent: () => (
     <div className="container-page py-32 text-center">
@@ -36,11 +44,16 @@ export const Route = createFileRoute("/product/$slug")({
 });
 
 function ProductPage() {
-  const { product } = Route.useLoaderData() as { product: ProductWithVariants };
-  const { add } = useCart();
+  const { product, reviews: initialReviews } = Route.useLoaderData() as {
+    product: ProductWithVariants;
+    reviews: Awaited<ReturnType<typeof fetchApprovedReviews>>;
+  };
+  const { add, items } = useCart();
+  const { countryCode } = useMarket();
+  const { availableForVariant, isLoading: stockLoading, data: stockMap } = useMarketStock();
   const [qty, setQty] = useState(1);
   const [reviewRefresh, setReviewRefresh] = useState(0);
-  const variants = product.variants.length
+  const variants: ProductVariant[] = product.variants.length
     ? product.variants
     : [{
         id: product.id,
@@ -49,6 +62,8 @@ function ProductPage() {
         weight_unit: "kg" as const,
         price_usd: product.price_usd,
         price_fcfa: product.price_fcfa,
+        price_cdf: (product as any).price_cdf ?? 0,
+        rdc_price_currency: (product as any).rdc_price_currency ?? "usd",
         sort_order: 0,
         is_active: true,
       }];
@@ -57,8 +72,33 @@ function ProductPage() {
     () => variants.find((v) => v.id === selectedVariantId) ?? variants[0],
     [variants, selectedVariantId],
   );
+  const available = availableForVariant(selectedVariant.id);
+  const inCartQty = items.find((it) => it.slug === product.slug && it.variantId === selectedVariant.id)?.qty ?? 0;
+  const remaining = Math.max(0, available - inCartQty);
+  const outOfStock = !stockLoading && available <= 0;
+
+  useEffect(() => {
+    if (stockLoading || !stockMap) return;
+    const firstAvailable = variants.find((v) => (stockMap[v.id] ?? 0) > 0);
+    if (firstAvailable && (stockMap[selectedVariantId] ?? 0) <= 0) {
+      setSelectedVariantId(firstAvailable.id);
+    }
+  }, [variants, selectedVariantId, stockLoading, stockMap]);
+
+  useEffect(() => {
+    if (remaining > 0 && qty > remaining) setQty(remaining);
+  }, [remaining, qty]);
 
   function addToCart() {
+    if (outOfStock) {
+      toast.error("Fini en stock");
+      return;
+    }
+    if (qty > remaining) {
+      toast.error(remaining > 0 ? `Stock limité : ${remaining} disponible(s)` : "Fini en stock");
+      return;
+    }
+    const rdcCurrency = rdcCurrencyOf(selectedVariant);
     add(
       {
         slug: product.slug,
@@ -67,6 +107,8 @@ function ProductPage() {
         variantLabel: formatVariantLabel(selectedVariant.weight_value, selectedVariant.weight_unit),
         priceFcfa: selectedVariant.price_fcfa,
         priceUsd: selectedVariant.price_usd,
+        priceCdf: selectedVariant.price_cdf ?? 0,
+        rdcCurrency,
         image: product.image_url ?? "",
       },
       qty,
@@ -98,10 +140,15 @@ function ProductPage() {
           <h1 className="font-display text-5xl text-espresso mb-3">{product.name}</h1>
           {product.is_bestseller && <p className="text-muted-foreground mb-8">Best-seller The Sisters Africa</p>}
 
-          <div className="flex items-baseline gap-3 mb-6">
-            <span className="font-display text-4xl text-copper">${selectedVariant.price_usd}</span>
-            <span className="text-sm text-muted-foreground">· {formatPrice(selectedVariant.price_fcfa, selectedVariant.price_usd).split(" · ")[0]}</span>
+          <div className="flex items-baseline gap-3 mb-3">
+            <span className="font-display text-4xl text-copper">{formatProductPrice(selectedVariant, countryCode)}</span>
           </div>
+
+          {outOfStock && (
+            <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+              Fini en stock — ce produit n&apos;est plus disponible pour le moment dans votre région.
+            </div>
+          )}
 
           {variants.length > 1 && (
             <div className="mb-8">
@@ -109,26 +156,31 @@ function ProductPage() {
               <div className="grid gap-2">
                 {variants.map((variant) => {
                   const active = variant.id === selectedVariantId;
+                  const unit = productUnitPrice(variant, countryCode);
+                  const variantAvailable = availableForVariant(variant.id);
+                  const variantOut = !stockLoading && variantAvailable <= 0;
                   return (
                     <label
                       key={variant.id}
                       className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${
                         active ? "border-copper bg-copper/10" : "border-border hover:border-copper/40"
-                      }`}
+                      } ${variantOut ? "opacity-60" : ""}`}
                     >
                       <span className="flex items-center gap-3">
                         <input
                           type="radio"
                           name="variant"
                           checked={active}
+                          disabled={variantOut}
                           onChange={() => setSelectedVariantId(variant.id)}
                           className="accent-copper"
                         />
-                        <span className="font-medium">{formatVariantLabel(variant.weight_value, variant.weight_unit)}</span>
+                        <span className="font-medium">
+                          {formatVariantLabel(variant.weight_value, variant.weight_unit)}
+                          {variantOut ? " — Fini en stock" : ""}
+                        </span>
                       </span>
-                      <span className="text-sm text-copper">
-                        ${variant.price_usd} · {variant.price_fcfa.toLocaleString("fr-FR")} FCFA
-                      </span>
+                      <span className="text-sm text-copper">{formatLineTotal(unit.amount, unit.label)}</span>
                     </label>
                   );
                 })}
@@ -148,18 +200,18 @@ function ProductPage() {
 
           <div className="flex items-center gap-3 mb-8">
             <div className="flex items-center border border-border rounded-sm">
-              <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="px-4 py-3 text-espresso hover:text-copper">−</button>
+              <button type="button" disabled={outOfStock || qty <= 1} onClick={() => setQty((q) => Math.max(1, q - 1))} className="px-4 py-3 text-espresso hover:text-copper disabled:opacity-40">−</button>
               <span className="px-4 text-sm w-10 text-center">{qty}</span>
-              <button onClick={() => setQty((q) => q + 1)} className="px-4 py-3 text-espresso hover:text-copper">+</button>
+              <button type="button" disabled={outOfStock || qty >= remaining} onClick={() => setQty((q) => Math.min(remaining, q + 1))} className="px-4 py-3 text-espresso hover:text-copper disabled:opacity-40">+</button>
             </div>
-            <button onClick={addToCart} className="btn-hero flex-1">
-              <ShoppingBag className="w-4 h-4" /> Ajouter au panier
+            <button type="button" onClick={addToCart} disabled={outOfStock || remaining <= 0} className="btn-hero flex-1 disabled:opacity-50">
+              <ShoppingBag className="w-4 h-4" /> {outOfStock ? "Fini en stock" : "Ajouter au panier"}
             </button>
           </div>
         </div>
       </section>
       <section className="container-page pb-20 grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
-        <Reviews productSlug={product.slug} refreshKey={reviewRefresh} />
+        <Reviews productSlug={product.slug} refreshKey={reviewRefresh} initialReviews={initialReviews} />
         <ReviewForm productSlug={product.slug} onSubmitted={() => setReviewRefresh((v) => v + 1)} />
       </section>
     </>

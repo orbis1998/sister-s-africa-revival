@@ -19,6 +19,7 @@ const permKeys = [
   ["can_manage_orders", "Commandes"],
   ["can_manage_logistics", "Logistique"],
   ["can_view_accounting", "Comptabilité"],
+  ["can_record_wholesale", "Vente en gros"],
   ["can_manage_pos", "POS"],
   ["can_manage_users", "Utilisateurs"],
 ] as const;
@@ -31,7 +32,7 @@ function UsersPage() {
   const { data: users = [], isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: () => listFn({}) });
   const { data: posList = [] } = useQuery({
     queryKey: ["admin-pos-for-users"],
-    queryFn: async () => (await supabase.from("points_of_sale").select("id,name,city").order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("points_of_sale").select("id,name,city,city_scope").order("name")).data ?? [],
   });
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<any>({
@@ -115,6 +116,17 @@ function UsersPage() {
                 </select>
               )}
             </div>
+            {form.role === "livreur" && (
+              <div className="mt-4">
+                <label className="text-xs uppercase tracking-widest mb-2 block">Point de vente associé (obligatoire)</label>
+                <select value={form.pos_id} onChange={(e) => setForm({ ...form, pos_id: e.target.value })} className="w-full px-3 py-2 border border-border rounded bg-background">
+                  <option value="">Sélectionner un POS</option>
+                  {posList.filter((p: any) => !form.city_scope || p.city_scope === form.city_scope).map((p: any) => (
+                    <option key={p.id} value={p.id}>{p.name}{p.city ? ` · ${p.city}` : ""}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {form.role === "pos" && (
               <div className="mt-4">
                 <label className="text-xs uppercase tracking-widest mb-2 block">Point de vente associé</label>
@@ -139,10 +151,12 @@ function UsersPage() {
                   ))}
                 </div>
                 {form.permissions.can_manage_stock && (
-                  <div className="mt-4 rounded-xl border border-border bg-cream/40 p-4">
-                    <div className="text-xs uppercase tracking-widest mb-2">Points de vente autorisés (stock)</div>
-                    <div className="grid gap-2">
-                      {posList.map((p: any) => (
+                  <p className="mb-2 text-xs text-muted-foreground">Cochez les POS dont ce manager gère le stock.</p>
+                )}
+                <div className="rounded-xl border border-border bg-cream/40 p-4">
+                  <div className="text-xs uppercase tracking-widest mb-2">Points de vente associés (obligatoire)</div>
+                  <div className="grid gap-2">
+                    {posList.filter((p: any) => !form.city_scope || p.city_scope === form.city_scope || !p.city_scope).map((p: any) => (
                         <label key={p.id} className="flex items-center gap-2 text-sm">
                           <input
                             type="checkbox"
@@ -155,16 +169,25 @@ function UsersPage() {
                             }}
                           />
                           {p.name}{p.city ? ` · ${p.city}` : ""}
-                        </label>
-                      ))}
-                    </div>
+                      </label>
+                    ))}
                   </div>
-                )}
+                </div>
               </div>
             )}
             <div className="flex gap-2 mt-6 justify-end">
               <button className="btn-ghost" onClick={() => setOpen(false)}>Annuler</button>
-              <button className="btn-hero" disabled={createMut.isPending} onClick={() => createMut.mutate(form)}>
+              <button className="btn-hero" disabled={createMut.isPending} onClick={() => {
+                if (form.role === "manager" && !(form.pos_ids as string[]).length) {
+                  toast.error("Sélectionnez au moins un point de vente pour ce manager");
+                  return;
+                }
+                if (form.role === "livreur" && !form.pos_id) {
+                  toast.error("Sélectionnez un point de vente pour ce livreur");
+                  return;
+                }
+                createMut.mutate(form);
+              }}>
                 {createMut.isPending ? "Création…" : "Créer"}
               </button>
             </div>

@@ -11,7 +11,9 @@ import { Loader2, MessageCircle, Phone, MapPin, Plus, Trash2 } from "lucide-reac
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import { lookupCommuneDeliveryFee } from "@/lib/delivery.functions";
+import { getStaffStockForCity } from "@/lib/stock.functions";
 import { formatDeliveryFeeByCountry } from "@/lib/staff-scope";
+import { formatVariantLabel } from "@/lib/product-variants";
 
 export const Route = createFileRoute("/_authenticated/admin/logistics")({
   head: () => ({ meta: [{ title: "Logistique — Admin" }] }),
@@ -94,12 +96,13 @@ function LogisticsPage() {
   const upd = useServerFn(updateOrderStatus);
   const createManual = useServerFn(createStaffOrder);
   const lookupFee = useServerFn(lookupCommuneDeliveryFee);
+  const staffStockFn = useServerFn(getStaffStockForCity);
   const qc = useQueryClient();
   const [filter, setFilter] = useState<string>("all");
   const [manualOpen, setManualOpen] = useState(false);
   const minDeliveryDate = tomorrowInputDate();
   const [manual, setManual] = useState<any>(() => emptyManualOrder(minDeliveryDate));
-  const [manualProduct, setManualProduct] = useState({ product_id: "", qty: 1 });
+  const [manualProduct, setManualProduct] = useState({ product_id: "", variant_id: "", qty: 1 });
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [feeLoading, setFeeLoading] = useState(false);
 
@@ -114,7 +117,39 @@ function LogisticsPage() {
     queryKey: ["manual-order-products"],
     queryFn: async () => (await supabase.from("products").select("*").eq("is_active", true).order("name")).data ?? [],
   });
+  const variants = useQuery({
+    queryKey: ["manual-order-variants"],
+    queryFn: async () => (await supabase.from("product_variants").select("*").eq("is_active", true).order("sort_order")).data ?? [],
+  });
+  const manualStock = useQuery({
+    queryKey: ["manual-order-stock", manual.country_code, manual.city],
+    enabled: !!manual.city,
+    queryFn: () => staffStockFn({ data: { country_code: manual.country_code, city: manual.city } }),
+  });
   const selectedProduct = products.data?.find((product: any) => product.id === manualProduct.product_id);
+  const productVariants = useMemo(() => {
+    if (!selectedProduct) return [];
+    const rows = (variants.data ?? []).filter((v: any) => v.product_id === selectedProduct.id);
+    if (rows.length) return rows;
+    return [{
+      id: selectedProduct.id,
+      product_id: selectedProduct.id,
+      weight_value: 1,
+      weight_unit: "kg",
+      price_usd: selectedProduct.price_usd,
+      price_fcfa: selectedProduct.price_fcfa,
+    }];
+  }, [selectedProduct, variants.data]);
+  const selectedVariant = productVariants.find((v: any) => v.id === manualProduct.variant_id) ?? productVariants[0];
+  const stockForVariant = (variantId: string) => Number((manualStock.data as Record<string, number> | undefined)?.[variantId] ?? 0);
+  const manualQtyInOrder = (variantId: string) =>
+    manual.items
+      .filter((item: any) => item.variantId === variantId)
+      .reduce((sum: number, item: any) => sum + Number(item.qty ?? 0), 0);
+  const selectedAvailable = selectedVariant ? stockForVariant(selectedVariant.id) : 0;
+  const selectedRemaining = selectedVariant
+    ? Math.max(0, selectedAvailable - manualQtyInOrder(selectedVariant.id))
+    : 0;
   const manualTotals = useMemo(() => {
     return manual.items.reduce((sum: { usd: number; fcfa: number }, item: any) => ({
       usd: sum.usd + Number(item.priceUsd ?? 0) * Number(item.qty ?? 1),
@@ -157,7 +192,7 @@ function LogisticsPage() {
       toast.success("Commande créée");
       setManualOpen(false);
       setManual(emptyManualOrder(minDeliveryDate));
-      setManualProduct({ product_id: "", qty: 1 });
+      setManualProduct({ product_id: "", variant_id: "", qty: 1 });
       setDeliveryFee(0);
       qc.invalidateQueries({ queryKey: ["orders"] });
     },
@@ -224,39 +259,71 @@ function LogisticsPage() {
             <textarea placeholder="Notes" value={manual.notes} onChange={(e) => setManual({ ...manual, notes: e.target.value })} className="input-admin resize-none md:col-span-3" rows={3} />
           </div>
           <div className="mt-5 rounded-2xl border border-border bg-cream/60 p-4">
-            <div className="grid gap-3 md:grid-cols-[1fr_120px_auto]">
-              <select value={manualProduct.product_id} onChange={(e) => setManualProduct({ ...manualProduct, product_id: e.target.value })} className="input-admin">
+            <div className="grid gap-3 md:grid-cols-[1fr_1fr_100px_auto]">
+              <select value={manualProduct.product_id} onChange={(e) => setManualProduct({ product_id: e.target.value, variant_id: "", qty: manualProduct.qty })} className="input-admin">
                 <option value="">Sélectionner un produit</option>
-                {(products.data ?? []).map((product: any) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} — {manual.country_code === "CG"
-                      ? `${Number(product.price_fcfa).toLocaleString("fr-FR")} FCFA`
-                      : `$${product.price_usd}`}
-                  </option>
-                ))}
+                {(products.data ?? []).map((product: any) => {
+                  const productVariantRows = (variants.data ?? []).filter((v: any) => v.product_id === product.id);
+                  const variantIds = productVariantRows.length
+                    ? productVariantRows.map((v: any) => v.id)
+                    : [product.id];
+                  const avail = variantIds.reduce((sum: number, id: string) => sum + stockForVariant(id), 0);
+                  return (
+                    <option key={product.id} value={product.id} disabled={avail <= 0}>
+                      {product.name}{avail <= 0 ? " — Fini en stock" : ` (${avail} dispo)`}
+                    </option>
+                  );
+                })}
               </select>
-              <input type="number" min={1} value={manualProduct.qty} onChange={(e) => setManualProduct({ ...manualProduct, qty: Number.parseInt(e.target.value || "1", 10) })} className="input-admin" />
+              {selectedProduct && productVariants.length > 0 && (
+                <select
+                  value={manualProduct.variant_id || selectedVariant?.id || ""}
+                  onChange={(e) => setManualProduct({ ...manualProduct, variant_id: e.target.value })}
+                  className="input-admin"
+                >
+                  {productVariants.map((v: any) => {
+                    const avail = stockForVariant(v.id);
+                    return (
+                      <option key={v.id} value={v.id} disabled={avail <= 0}>
+                        {formatVariantLabel(Number(v.weight_value), v.weight_unit)}
+                        {avail <= 0 ? " — Fini en stock" : ` (${avail} dispo)`}
+                        {" · "}
+                        {manual.country_code === "CG"
+                          ? `${Number(v.price_fcfa).toLocaleString("fr-FR")} FCFA`
+                          : `$${v.price_usd}`}
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
+              <input type="number" min={1} max={Math.max(1, selectedRemaining || 1)} value={manualProduct.qty} onChange={(e) => setManualProduct({ ...manualProduct, qty: Number.parseInt(e.target.value || "1", 10) })} className="input-admin" />
               <button
                 type="button"
                 className="rounded bg-espresso px-4 py-2 text-xs font-medium uppercase tracking-widest text-cream disabled:opacity-50"
-                disabled={!selectedProduct}
+                disabled={!selectedProduct || !selectedVariant || selectedRemaining <= 0}
                 onClick={() => {
-                  if (!selectedProduct) return;
+                  if (!selectedProduct || !selectedVariant) return;
+                  if (selectedRemaining <= 0) {
+                    toast.error(`${selectedProduct.name} — fini en stock`);
+                    return;
+                  }
+                  const qty = Math.max(1, Math.min(selectedRemaining, manualProduct.qty || 1));
+                  const label = formatVariantLabel(Number(selectedVariant.weight_value), selectedVariant.weight_unit);
                   const item = {
                     slug: selectedProduct.slug,
                     name: selectedProduct.name,
-                    variantId: selectedProduct.id,
-                    variantLabel: "Format standard",
-                    qty: Math.max(1, manualProduct.qty || 1),
-                    priceUsd: Number(selectedProduct.price_usd ?? 0),
-                    priceFcfa: Number(selectedProduct.price_fcfa ?? 0),
+                    variantId: selectedVariant.id,
+                    variantLabel: label,
+                    qty,
+                    priceUsd: Number(selectedVariant.price_usd ?? 0),
+                    priceFcfa: Number(selectedVariant.price_fcfa ?? 0),
                   };
                   const existingIndex = manual.items.findIndex((current: any) => current.variantId === item.variantId);
                   const nextItems = existingIndex >= 0
                     ? manual.items.map((current: any, index: number) => index === existingIndex ? { ...current, qty: current.qty + item.qty } : current)
                     : [...manual.items, item];
                   setManual({ ...manual, items: nextItems });
-                  setManualProduct({ product_id: "", qty: 1 });
+                  setManualProduct({ product_id: "", variant_id: "", qty: 1 });
                 }}
               >
                 Ajouter
@@ -268,7 +335,7 @@ function LogisticsPage() {
               ) : manual.items.map((item: any) => (
                 <div key={item.variantId} className="flex items-center justify-between gap-3 rounded-xl bg-card p-3 text-sm">
                   <div>
-                    <strong>{item.qty} × {item.name}</strong>
+                    <strong>{item.qty} × {item.name}{item.variantLabel ? ` (${item.variantLabel})` : ""}</strong>
                     <div className="text-xs text-muted-foreground">
                       {manual.country_code === "CG"
                         ? `${(item.priceFcfa * item.qty).toLocaleString("fr-FR")} FCFA`

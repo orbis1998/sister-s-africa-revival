@@ -79,10 +79,10 @@ function PosDashboard() {
   }, [selectedProduct, variants.data]);
   const selectedVariant = productVariants.find((v: any) => v.id === sale.variant_id) ?? productVariants[0];
   const availableQty = useMemo(() => {
-    if (!selectedProduct || !assignment.data?.pos_id) return 0;
-    const row = (stock.data ?? []).find((s: any) => s.product_id === selectedProduct.id);
+    if (!selectedVariant || !assignment.data?.pos_id) return 0;
+    const row = (stock.data ?? []).find((s: any) => s.variant_id === selectedVariant.id);
     return row?.quantity ?? 0;
-  }, [selectedProduct, assignment.data?.pos_id, stock.data]);
+  }, [selectedVariant, assignment.data?.pos_id, stock.data]);
   const totalFcfa = sale.items.reduce((sum: number, item: any) => sum + Number(item.price_fcfa ?? 0) * Number(item.qty ?? 1), 0);
   const totalUsd = sale.items.reduce((sum: number, item: any) => sum + Number(item.price_usd ?? 0) * Number(item.qty ?? 1), 0);
 
@@ -133,7 +133,7 @@ function PosDashboard() {
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             <Stat label="Ventes du jour" value={todaySales.length} />
             <Stat label="CA journalier" value={`${todayRevenue.toLocaleString("fr-FR")} FCFA`} />
-            <Stat label="Produits en stock" value={stock.data?.length ?? 0} />
+            <Stat label="Variantes en stock" value={stock.data?.filter((s: any) => s.quantity > 0).length ?? 0} />
           </div>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">

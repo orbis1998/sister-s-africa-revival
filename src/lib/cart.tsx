@@ -1,12 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { RdcPriceCurrency } from "@/lib/market";
 
 export interface CartItem {
   slug: string;
   name: string;
   variantId: string;
   variantLabel: string;
-  priceFcfa: number;
   priceUsd: number;
+  priceFcfa: number;
+  priceCdf: number;
+  rdcCurrency: RdcPriceCurrency;
   image: string;
   qty: number;
 }
@@ -19,11 +22,12 @@ interface CartContextValue {
   clear: () => void;
   totalFcfa: number;
   totalUsd: number;
+  totalCdf: number;
   count: number;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
-const STORAGE_KEY = "ts-cart-v1";
+const STORAGE_KEY = "ts-cart-v2";
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -69,9 +73,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<CartContextValue>(() => {
     const totalFcfa = items.reduce((s, i) => s + i.priceFcfa * i.qty, 0);
-    const totalUsd = items.reduce((s, i) => s + i.priceUsd * i.qty, 0);
+    const totalUsd = items.reduce((s, i) => s + (i.rdcCurrency === "usd" ? i.priceUsd * i.qty : 0), 0);
+    const totalCdf = items.reduce((s, i) => s + (i.rdcCurrency === "cdf" ? i.priceCdf * i.qty : 0), 0);
     const count = items.reduce((s, i) => s + i.qty, 0);
-    return { items, add, remove, setQty, clear, totalFcfa, totalUsd, count };
+    return { items, add, remove, setQty, clear, totalFcfa, totalUsd, totalCdf, count };
   }, [items, add, remove, setQty, clear]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

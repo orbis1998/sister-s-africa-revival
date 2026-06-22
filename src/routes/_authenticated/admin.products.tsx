@@ -20,6 +20,7 @@ type VariantForm = {
   weight_unit: WeightUnit;
   price_usd: string;
   price_fcfa: string;
+  price_cdf: string;
 };
 
 const emptyVariant = (): VariantForm => ({
@@ -27,6 +28,7 @@ const emptyVariant = (): VariantForm => ({
   weight_unit: "kg",
   price_usd: "",
   price_fcfa: "",
+  price_cdf: "",
 });
 
 const empty = {
@@ -38,6 +40,8 @@ const empty = {
   seo_description: "",
   price_usd: "",
   price_fcfa: "",
+  price_cdf: "",
+  rdc_price_currency: "usd" as "usd" | "cdf",
   quantity: "",
   image_url: "",
   imageFile: null as File | null,
@@ -84,11 +88,13 @@ function ProductsPage() {
       weight_unit: v.weight_unit as WeightUnit,
       price_usd: String(v.price_usd),
       price_fcfa: String(v.price_fcfa),
+      price_cdf: String(v.price_cdf ?? 0),
     }));
 
   const save = useMutation({
     mutationFn: async (data: any) => {
       const { imageFile, variants, ...payload } = data;
+      const rdcCurrency = (payload.rdc_price_currency === "cdf" ? "cdf" : "usd") as "usd" | "cdf";
       const parsedVariants = (variants as VariantForm[])
         .filter((v) => Number(v.weight_value) > 0)
         .map((v, index) => ({
@@ -97,16 +103,23 @@ function ProductsPage() {
           weight_unit: v.weight_unit,
           price_usd: Number(v.price_usd || 0),
           price_fcfa: Number.parseInt(v.price_fcfa || "0", 10),
+          price_cdf: Number.parseInt(v.price_cdf || "0", 10),
+          rdc_price_currency: rdcCurrency,
           sort_order: index,
         }));
       if (parsedVariants.length) {
         payload.price_usd = parsedVariants[0].price_usd;
         payload.price_fcfa = parsedVariants[0].price_fcfa;
+        payload.price_cdf = parsedVariants[0].price_cdf;
+        payload.rdc_price_currency = rdcCurrency;
       } else {
         payload.price_usd = Number(payload.price_usd || 0);
         payload.price_fcfa = Number.parseInt(payload.price_fcfa || "0", 10);
+        payload.price_cdf = Number.parseInt(payload.price_cdf || "0", 10);
+        payload.rdc_price_currency = rdcCurrency;
       }
-      payload.quantity = Number.parseInt(payload.quantity || "0", 10);
+      payload.price_cdf = Number.parseInt(payload.price_cdf || "0", 10);
+      payload.rdc_price_currency = rdcCurrency;
       if (imageFile) {
         payload.image_url = await uploadProductImage(imageFile);
       }
@@ -138,6 +151,11 @@ function ProductsPage() {
       <div className="mt-8 grid md:grid-cols-2 gap-4">
         {products.map((p: any) => {
           const variants = variantsFor(p.id);
+          const rdcCur = p.rdc_price_currency === "cdf" ? "CDF" : "USD";
+          const rdcPrice = (v: VariantForm) =>
+            p.rdc_price_currency === "cdf"
+              ? `${Number(v.price_cdf || 0).toLocaleString("fr-FR")} CDF`
+              : `$${v.price_usd}`;
           return (
             <div key={p.id} className="bg-card border border-border rounded-2xl p-5 flex gap-4">
               {p.image_url ? (
@@ -154,14 +172,20 @@ function ProductsPage() {
                   <div className="mt-1 space-y-0.5">
                     {variants.map((v) => (
                       <p key={v.id} className="text-sm">
-                        {formatVariantLabel(Number(v.weight_value), v.weight_unit)} · ${v.price_usd} · {v.price_fcfa} FCFA
+                        {formatVariantLabel(Number(v.weight_value), v.weight_unit)} · {rdcPrice(v)} · {v.price_fcfa} FCFA
                       </p>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm mt-1"><span className="text-muted-foreground">Prix :</span> ${p.price_usd} · {p.price_fcfa} FCFA</p>
+                  <p className="text-sm mt-1">
+                    <span className="text-muted-foreground">Prix RDC ({rdcCur}) :</span>{" "}
+                    {p.rdc_price_currency === "cdf"
+                      ? `${Number(p.price_cdf ?? 0).toLocaleString("fr-FR")} CDF`
+                      : `$${p.price_usd}`}{" "}
+                    · <span className="text-muted-foreground">Congo :</span> {p.price_fcfa} FCFA
+                  </p>
                 )}
-                <p className="text-xs text-muted-foreground mt-1"><span className="text-muted-foreground">Stock en ligne :</span> {p.quantity ?? 0} unité{(p.quantity ?? 0) !== 1 ? "s" : ""}</p>
+                <p className="text-xs text-muted-foreground mt-1">Stock géré par POS dans Inventaire</p>
                 <div className="flex gap-1 mt-2">
                   {p.is_bestseller && <span className="text-[10px] px-2 py-0.5 rounded bg-gold/30">Best-seller</span>}
                   {!p.is_active && <span className="text-[10px] px-2 py-0.5 rounded bg-muted">Inactif</span>}
@@ -171,6 +195,8 @@ function ProductsPage() {
                 <button
                   onClick={() => setForm({
                     ...p,
+                    price_cdf: String(p.price_cdf ?? 0),
+                    rdc_price_currency: p.rdc_price_currency === "cdf" ? "cdf" : "usd",
                     imageFile: null,
                     variants: variants.length ? variants : [emptyVariant()],
                   })}
@@ -218,6 +244,22 @@ function ProductsPage() {
                   <p className="text-xs text-muted-foreground">
                     Ajoutez plusieurs lignes si le produit existe en plusieurs poids (ex. 500 g, 1 kg, 2 kg). Le client choisira sur la fiche produit.
                   </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] uppercase tracking-widest text-muted-foreground">Devise RDC (par produit)</span>
+                      <select
+                        value={form.rdc_price_currency ?? "usd"}
+                        onChange={(e) => setForm({ ...form, rdc_price_currency: e.target.value as "usd" | "cdf" })}
+                        className="input-admin"
+                      >
+                        <option value="usd">USD — clients RDC voient le prix en dollars</option>
+                        <option value="cdf">CDF — clients RDC voient le prix en francs congolais</option>
+                      </select>
+                    </label>
+                    <p className="self-end text-xs text-muted-foreground">
+                      Congo (Brazzaville / Pointe-Noire) : toujours FCFA. Livraison RDC : CDF au checkout.
+                    </p>
+                  </div>
                   {(form.variants as VariantForm[]).map((variant, index) => (
                     <div key={variant.id ?? index} className="grid grid-cols-12 gap-2 items-end">
                       <div className="col-span-3">
@@ -251,22 +293,38 @@ function ProductsPage() {
                         </select>
                       </div>
                       <div className="col-span-3">
-                        <span className="mb-1 block text-[10px] uppercase tracking-widest text-muted-foreground">USD</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min={0}
-                          value={variant.price_usd}
-                          onChange={(e) => {
-                            const next = [...form.variants];
-                            next[index] = { ...variant, price_usd: e.target.value };
-                            setForm({ ...form, variants: next });
-                          }}
-                          className="input-admin"
-                        />
+                        <span className="mb-1 block text-[10px] uppercase tracking-widest text-muted-foreground">
+                          {form.rdc_price_currency === "cdf" ? "Prix CDF (RDC)" : "Prix USD (RDC)"}
+                        </span>
+                        {form.rdc_price_currency === "cdf" ? (
+                          <input
+                            type="number"
+                            min={0}
+                            value={variant.price_cdf}
+                            onChange={(e) => {
+                              const next = [...form.variants];
+                              next[index] = { ...variant, price_cdf: e.target.value };
+                              setForm({ ...form, variants: next });
+                            }}
+                            className="input-admin"
+                          />
+                        ) : (
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            value={variant.price_usd}
+                            onChange={(e) => {
+                              const next = [...form.variants];
+                              next[index] = { ...variant, price_usd: e.target.value };
+                              setForm({ ...form, variants: next });
+                            }}
+                            className="input-admin"
+                          />
+                        )}
                       </div>
                       <div className="col-span-3">
-                        <span className="mb-1 block text-[10px] uppercase tracking-widest text-muted-foreground">FCFA</span>
+                        <span className="mb-1 block text-[10px] uppercase tracking-widest text-muted-foreground">FCFA (Congo)</span>
                         <input
                           type="number"
                           min={0}
@@ -301,10 +359,6 @@ function ProductsPage() {
                 </div>
               </Field>
 
-              <Field label="Stock disponible (vente en ligne)" className="col-span-2">
-                <input type="number" min={0} value={form.quantity || ""} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="input-admin" />
-                <p className="mt-1.5 text-xs text-muted-foreground">Stock central pour commandes web. Le stock POS se gère dans l'inventaire.</p>
-              </Field>
               <Field label="Image du produit" className="col-span-2">
                 <div className="rounded-2xl border border-dashed border-border bg-cream/50 p-4">
                   <div className="grid gap-4 sm:grid-cols-[120px_1fr] sm:items-center">

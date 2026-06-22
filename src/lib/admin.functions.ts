@@ -17,6 +17,12 @@ export const adminCreateUser = createServerFn({ method: "POST" })
   }) => d)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as any);
+    if (data.role === "manager" && !(data.pos_ids?.length)) {
+      throw new Error("Un manager doit être associé à au moins un point de vente");
+    }
+    if (data.role === "livreur" && !data.pos_id) {
+      throw new Error("Un livreur doit être associé à un point de vente");
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
@@ -33,6 +39,7 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       phone: data.phone,
       badge_id: data.badge_id?.trim() || null,
       city_scope: data.city_scope || null,
+      pos_id: data.role === "livreur" ? data.pos_id || null : null,
     });
     // Remove default 'client' role assigned by trigger, then add target role
     await supabaseAdmin.from("user_roles").delete().eq("user_id", uid);
@@ -45,6 +52,7 @@ export const adminCreateUser = createServerFn({ method: "POST" })
         can_manage_orders: !!data.permissions?.can_manage_orders,
         can_manage_logistics: !!data.permissions?.can_manage_logistics,
         can_view_accounting: !!data.permissions?.can_view_accounting,
+        can_record_wholesale: !!data.permissions?.can_record_wholesale,
         can_manage_pos: !!data.permissions?.can_manage_pos,
         can_manage_users: !!data.permissions?.can_manage_users,
         pos_ids: data.pos_ids ?? [],
@@ -98,6 +106,7 @@ async function assertProductEditor(ctx: { supabase: any; userId: string }) {
 }
 
 async function assertStockEditor(ctx: { supabase: any; userId: string }, posId: string | null) {
+  if (!posId) throw new Error("Le stock se gère par point de vente — sélectionnez un POS");
   const { data: isAdmin } = await ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" });
   if (isAdmin) return;
   const { data: perms } = await ctx.supabase
@@ -106,7 +115,6 @@ async function assertStockEditor(ctx: { supabase: any; userId: string }, posId: 
     .eq("user_id", ctx.userId)
     .maybeSingle();
   if (!perms?.can_manage_stock) throw new Error("Forbidden: gestion stock non autorisée");
-  if (!posId) throw new Error("Forbidden: stock central réservé à l'admin");
   const allowed = (perms.pos_ids ?? []) as string[];
   if (!allowed.includes(posId)) throw new Error("Forbidden: point de vente non autorisé");
 }
@@ -117,6 +125,8 @@ type VariantInput = {
   weight_unit: "g" | "kg";
   price_usd: number;
   price_fcfa: number;
+  price_cdf?: number;
+  rdc_price_currency?: "usd" | "cdf";
   sort_order?: number;
   is_active?: boolean;
 };
@@ -126,7 +136,8 @@ export const adminUpsertProduct = createServerFn({ method: "POST" })
   .inputValidator((d: {
     id?: string; slug: string; name: string; description?: string; content_html?: string;
     seo_title?: string; seo_description?: string;
-    price_usd: number; price_fcfa: number; quantity?: number; image_url?: string;
+    price_usd: number; price_fcfa: number; price_cdf?: number; rdc_price_currency?: "usd" | "cdf";
+    quantity?: number; image_url?: string;
     is_active?: boolean; is_bestseller?: boolean;
     variants?: VariantInput[];
   }) => d)
@@ -139,6 +150,8 @@ export const adminUpsertProduct = createServerFn({ method: "POST" })
       const sorted = [...activeVariants].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
       productPayload.price_usd = sorted[0].price_usd;
       productPayload.price_fcfa = sorted[0].price_fcfa;
+      productPayload.price_cdf = sorted[0].price_cdf ?? 0;
+      productPayload.rdc_price_currency = sorted[0].rdc_price_currency ?? productPayload.rdc_price_currency ?? "usd";
     }
     const { error } = await supabaseAdmin.from("products").upsert(productPayload, { onConflict: "slug" });
     if (error) throw new Error(error.message);
@@ -165,6 +178,8 @@ export const adminUpsertProduct = createServerFn({ method: "POST" })
           weight_unit: variant.weight_unit,
           price_usd: variant.price_usd,
           price_fcfa: variant.price_fcfa,
+          price_cdf: variant.price_cdf ?? 0,
+          rdc_price_currency: variant.rdc_price_currency ?? productPayload.rdc_price_currency ?? "usd",
           sort_order: variant.sort_order ?? index,
           is_active: variant.is_active ?? true,
         };
@@ -189,25 +204,31 @@ export const adminDeleteProduct = createServerFn({ method: "POST" })
 
 export const adminSetStock = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { product_id: string; pos_id: string | null; quantity: number; low_stock_threshold?: number }) => d)
+  .inputValidator((d: { product_id: string; variant_id: string; pos_id: string | null; quantity: number; low_stock_threshold?: number }) => d)
   .handler(async ({ data, context }) => {
     await assertStockEditor(context as any, data.pos_id);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: previous } = await supabaseAdmin
       .from("stock")
       .select("quantity")
-      .eq("product_id", data.product_id)
+      .eq("variant_id", data.variant_id)
       .eq("pos_id", data.pos_id)
       .maybeSingle();
     const previousQty = previous?.quantity ?? 0;
     const delta = data.quantity - previousQty;
-    const payload: any = { product_id: data.product_id, pos_id: data.pos_id, quantity: data.quantity };
+    const payload: any = {
+      product_id: data.product_id,
+      variant_id: data.variant_id,
+      pos_id: data.pos_id,
+      quantity: data.quantity,
+    };
     if (typeof data.low_stock_threshold === "number") payload.low_stock_threshold = data.low_stock_threshold;
-    const { error } = await supabaseAdmin.from("stock").upsert(payload, { onConflict: "product_id,pos_id" });
+    const { error } = await supabaseAdmin.from("stock").upsert(payload, { onConflict: "variant_id,pos_id" });
     if (error) throw new Error(error.message);
     if (delta !== 0) {
       await supabaseAdmin.from("stock_movements").insert({
         product_id: data.product_id,
+        variant_id: data.variant_id,
         pos_id: data.pos_id,
         delta,
         reason: "Mise à jour manuelle",
@@ -219,13 +240,60 @@ export const adminSetStock = createServerFn({ method: "POST" })
 
 export const adminUpsertPOS = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id?: string; name: string; city?: string; address?: string; phone?: string }) => d)
+  .inputValidator((d: {
+    id?: string; name: string; city?: string; city_scope?: StaffDirection | "";
+    address?: string; phone?: string; manager_user_id?: string | null;
+  }) => d)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as any);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("points_of_sale").upsert(data);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    const { manager_user_id, ...posPayload } = data;
+    let savedId = posPayload.id as string | undefined;
+    if (posPayload.id) {
+      const { error } = await supabaseAdmin.from("points_of_sale").update({
+        ...posPayload,
+        manager_user_id: manager_user_id || null,
+      }).eq("id", posPayload.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { data: inserted, error } = await supabaseAdmin.from("points_of_sale").insert({
+        name: posPayload.name,
+        city: posPayload.city,
+        city_scope: posPayload.city_scope || null,
+        address: posPayload.address,
+        phone: posPayload.phone,
+        manager_user_id: manager_user_id || null,
+      }).select("id").single();
+      if (error) throw new Error(error.message);
+      savedId = inserted.id;
+    }
+
+    if (manager_user_id && savedId) {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("city_scope")
+        .eq("id", manager_user_id)
+        .maybeSingle();
+      if (posPayload.city_scope && !profile?.city_scope) {
+        await supabaseAdmin.from("profiles").update({ city_scope: posPayload.city_scope }).eq("id", manager_user_id);
+      }
+      const { data: perms } = await supabaseAdmin
+        .from("manager_permissions")
+        .select("pos_ids")
+        .eq("user_id", manager_user_id)
+        .maybeSingle();
+      const current = new Set((perms?.pos_ids ?? []) as string[]);
+      current.add(savedId);
+      if (perms) {
+        await supabaseAdmin.from("manager_permissions").update({ pos_ids: [...current] }).eq("user_id", manager_user_id);
+      } else {
+        await supabaseAdmin.from("manager_permissions").insert({
+          user_id: manager_user_id,
+          pos_ids: [...current],
+        });
+      }
+    }
+    return { ok: true, id: savedId };
   });
 
 export const adminListReviews = createServerFn({ method: "GET" })

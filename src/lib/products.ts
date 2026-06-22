@@ -5,8 +5,8 @@ import { defaultVariant, sortVariants, type ProductVariant } from "@/lib/product
 export type Product = Database["public"]["Tables"]["products"]["Row"];
 export type ProductWithVariants = Product & { variants: ProductVariant[] };
 
-const productSelect = "id, slug, name, description, content_html, seo_title, seo_description, price_usd, price_fcfa, quantity, image_url, is_active, is_bestseller, created_at, updated_at";
-const variantSelect = "id, product_id, weight_value, weight_unit, price_usd, price_fcfa, sort_order, is_active";
+const productSelect = "id, slug, name, description, content_html, seo_title, seo_description, price_usd, price_fcfa, price_cdf, rdc_price_currency, quantity, image_url, is_active, is_bestseller, created_at, updated_at";
+const variantSelect = "id, product_id, weight_value, weight_unit, price_usd, price_fcfa, price_cdf, rdc_price_currency, sort_order, is_active";
 
 async function attachVariants<T extends Product>(products: T[]): Promise<(T & { variants: ProductVariant[] })[]> {
   if (!products.length) return [];
@@ -29,7 +29,7 @@ async function attachVariants<T extends Product>(products: T[]): Promise<(T & { 
   }));
 }
 
-export async function fetchProducts() {
+export async function fetchProducts(): Promise<ProductWithVariants[]> {
   const { data, error } = await supabase
     .from("products")
     .select(productSelect)
@@ -37,10 +37,10 @@ export async function fetchProducts() {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return attachVariants(data ?? []);
 }
 
-export async function fetchFeaturedProducts() {
+export async function fetchFeaturedProducts(): Promise<ProductWithVariants[]> {
   const { data, error } = await supabase
     .from("products")
     .select(productSelect)
@@ -50,7 +50,7 @@ export async function fetchFeaturedProducts() {
     .limit(3);
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return attachVariants(data ?? []);
 }
 
 export async function fetchProductBySlug(slug: string): Promise<ProductWithVariants | null> {

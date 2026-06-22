@@ -14,6 +14,7 @@ import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { CartProvider } from "@/lib/cart";
+import { MarketProvider } from "@/lib/market-context";
 import { AuthProvider } from "@/lib/auth";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
@@ -114,6 +115,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <MarketProvider>
         <CartProvider>
           <div className="min-h-screen flex flex-col">
             {!hideSiteChrome && <Header />}
@@ -125,6 +127,7 @@ function RootComponent() {
           {!hideSiteChrome && <WhatsAppFloat />}
           <Toaster position="top-center" richColors />
         </CartProvider>
+        </MarketProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
