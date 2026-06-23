@@ -5,8 +5,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { adminCreateUser, adminListUsers, adminDeleteUser } from "@/lib/admin.functions";
+import { adminUpdateManagerPermissions } from "@/lib/permissions.functions";
 import { directionLabel, STAFF_DIRECTIONS } from "@/lib/staff-scope";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin/users")({
@@ -30,12 +31,14 @@ function UsersPage() {
   const listFn = useServerFn(adminListUsers);
   const createFn = useServerFn(adminCreateUser);
   const deleteFn = useServerFn(adminDeleteUser);
+  const updatePermsFn = useServerFn(adminUpdateManagerPermissions);
   const { data: users = [], isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: () => listFn({}) });
   const { data: posList = [] } = useQuery({
     queryKey: ["admin-pos-for-users"],
     queryFn: async () => (await supabase.from("points_of_sale").select("id,name,city,city_scope").order("name")).data ?? [],
   });
   const [open, setOpen] = useState(false);
+  const [editUser, setEditUser] = useState<any | null>(null);
   const [form, setForm] = useState<any>({
     email: "", password: "", full_name: "", phone: "", badge_id: "",
     role: "livreur", city_scope: "kinshasa", permissions: {}, pos_id: "", pos_ids: [] as string[],
@@ -50,6 +53,81 @@ function UsersPage() {
     mutationFn: (user_id: string) => deleteFn({ data: { user_id } }),
     onSuccess: () => { toast.success("Compte supprimé"); qc.invalidateQueries({ queryKey: ["admin-users"] }); },
   });
+  const updatePermsMut = useMutation({
+    mutationFn: (payload: { user_id: string; permissions: Record<string, boolean>; pos_ids: string[] }) =>
+      updatePermsFn({ data: payload }),
+    onSuccess: () => {
+      toast.success("Permissions mises à jour");
+      setEditUser(null);
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  function openEditPermissions(user: any) {
+    const perms = user.manager_permissions ?? {};
+    const initial: Record<string, boolean> = {};
+    for (const [key] of permKeys) initial[key] = !!perms[key];
+    setEditUser({
+      id: user.id,
+      email: user.email,
+      full_name: user.profile?.full_name ?? "",
+      city_scope: user.profile?.city_scope ?? "kinshasa",
+      permissions: initial,
+      pos_ids: (perms.pos_ids ?? []) as string[],
+    });
+  }
+
+  function PermissionsEditor({
+    permissions,
+    posIds,
+    cityScope,
+    onChangePermissions,
+    onChangePosIds,
+  }: {
+    permissions: Record<string, boolean>;
+    posIds: string[];
+    cityScope: string;
+    onChangePermissions: (next: Record<string, boolean>) => void;
+    onChangePosIds: (next: string[]) => void;
+  }) {
+    return (
+      <>
+        <div className="grid grid-cols-2 gap-2">
+          {permKeys.map(([k, label]) => (
+            <label key={k} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={!!permissions[k]}
+                onChange={(e) => onChangePermissions({ ...permissions, [k]: e.target.checked })}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+        <div className="mt-4 rounded-xl border border-border bg-cream/40 p-4">
+          <div className="text-xs uppercase tracking-widest mb-2">Points de vente associés (obligatoire)</div>
+          <div className="grid gap-2">
+            {posList.filter((p: any) => !cityScope || p.city_scope === cityScope || !p.city_scope).map((p: any) => (
+              <label key={p.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={posIds.includes(p.id)}
+                  onChange={(e) => {
+                    const current = new Set(posIds);
+                    if (e.target.checked) current.add(p.id);
+                    else current.delete(p.id);
+                    onChangePosIds([...current]);
+                  }}
+                />
+                {p.name}{p.city ? ` · ${p.city}` : ""}
+              </label>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <StaffShell title="Administration" requiredRole="admin">
@@ -83,8 +161,19 @@ function UsersPage() {
                   </td>
                   <td className="p-3 text-xs text-muted-foreground">{u.pos_account?.points_of_sale?.name ?? "—"}</td>
                   <td className="p-3 text-right">
-                    <button onClick={() => confirm("Supprimer ce compte ?") && deleteMut.mutate(u.id)}
-                      className="text-destructive hover:bg-destructive/10 p-2 rounded"><Trash2 className="w-4 h-4" /></button>
+                    <div className="flex justify-end gap-1">
+                      {u.roles.includes("manager") && (
+                        <button
+                          onClick={() => openEditPermissions(u)}
+                          className="text-copper hover:bg-copper/10 p-2 rounded"
+                          title="Modifier les permissions"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button onClick={() => confirm("Supprimer ce compte ?") && deleteMut.mutate(u.id)}
+                        className="text-destructive hover:bg-destructive/10 p-2 rounded"><Trash2 className="w-4 h-4" /></button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -142,38 +231,13 @@ function UsersPage() {
             {form.role === "manager" && (
               <div className="mt-4">
                 <div className="text-xs uppercase tracking-widest mb-2">Permissions du manager</div>
-                <div className="grid grid-cols-2 gap-2">
-                  {permKeys.map(([k, label]) => (
-                    <label key={k} className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={!!form.permissions[k]}
-                        onChange={(e) => setForm({ ...form, permissions: { ...form.permissions, [k]: e.target.checked } })} />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-                {form.permissions.can_manage_stock && (
-                  <p className="mb-2 text-xs text-muted-foreground">Cochez les POS dont ce manager gère le stock.</p>
-                )}
-                <div className="rounded-xl border border-border bg-cream/40 p-4">
-                  <div className="text-xs uppercase tracking-widest mb-2">Points de vente associés (obligatoire)</div>
-                  <div className="grid gap-2">
-                    {posList.filter((p: any) => !form.city_scope || p.city_scope === form.city_scope || !p.city_scope).map((p: any) => (
-                        <label key={p.id} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={(form.pos_ids as string[]).includes(p.id)}
-                            onChange={(e) => {
-                              const current = new Set(form.pos_ids as string[]);
-                              if (e.target.checked) current.add(p.id);
-                              else current.delete(p.id);
-                              setForm({ ...form, pos_ids: [...current] });
-                            }}
-                          />
-                          {p.name}{p.city ? ` · ${p.city}` : ""}
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                <PermissionsEditor
+                  permissions={form.permissions}
+                  posIds={form.pos_ids}
+                  cityScope={form.city_scope}
+                  onChangePermissions={(permissions) => setForm({ ...form, permissions })}
+                  onChangePosIds={(pos_ids) => setForm({ ...form, pos_ids })}
+                />
               </div>
             )}
             <div className="flex gap-2 mt-6 justify-end">
@@ -190,6 +254,44 @@ function UsersPage() {
                 createMut.mutate(form);
               }}>
                 {createMut.isPending ? "Création…" : "Créer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editUser && (
+        <div className="fixed inset-0 bg-espresso/60 z-50 flex items-center justify-center p-4" onClick={() => setEditUser(null)}>
+          <div className="bg-card rounded-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-display text-2xl">Permissions manager</h2>
+            <p className="text-sm text-muted-foreground mt-1">{editUser.full_name || editUser.email}</p>
+            <div className="mt-4">
+              <PermissionsEditor
+                permissions={editUser.permissions}
+                posIds={editUser.pos_ids}
+                cityScope={editUser.city_scope}
+                onChangePermissions={(permissions) => setEditUser({ ...editUser, permissions })}
+                onChangePosIds={(pos_ids) => setEditUser({ ...editUser, pos_ids })}
+              />
+            </div>
+            <div className="flex gap-2 mt-6 justify-end">
+              <button className="btn-ghost" onClick={() => setEditUser(null)}>Annuler</button>
+              <button
+                className="btn-hero"
+                disabled={updatePermsMut.isPending}
+                onClick={() => {
+                  if (!editUser.pos_ids.length) {
+                    toast.error("Sélectionnez au moins un point de vente");
+                    return;
+                  }
+                  updatePermsMut.mutate({
+                    user_id: editUser.id,
+                    permissions: editUser.permissions,
+                    pos_ids: editUser.pos_ids,
+                  });
+                }}
+              >
+                {updatePermsMut.isPending ? "Enregistrement…" : "Enregistrer"}
               </button>
             </div>
           </div>

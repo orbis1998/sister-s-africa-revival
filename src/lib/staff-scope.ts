@@ -52,6 +52,40 @@ export function formatScopedMoney(value: { total_usd?: number | null; total_fcfa
     : `$${Number(value.total_usd ?? 0).toFixed(2)}`;
 }
 
+export function regionUsesFcfa(region: { scopes: readonly StaffDirection[] }) {
+  return directionCurrency(region.scopes[0]) === "FCFA";
+}
+
+export function formatRegionMoney(
+  value: { usd?: number | null; fcfa?: number | null },
+  region: { scopes: readonly StaffDirection[] },
+) {
+  return regionUsesFcfa(region)
+    ? `${Number(value.fcfa ?? 0).toLocaleString("fr-FR")} FCFA`
+    : `$${Number(value.usd ?? 0).toFixed(2)}`;
+}
+
+/** Montant commande selon la région : RDC → USD, Congo → FCFA. */
+export function formatOrderAmount(order: {
+  total_fcfa?: number | null;
+  total_usd?: number | null;
+  delivery_fee_fcfa?: number | null;
+  delivery_fee_usd?: number | null;
+  city?: string | null;
+  country_code?: string | null;
+  city_scope?: string | null;
+}) {
+  const scope = (order.city_scope as StaffDirection | null) ?? directionFromCity(order.city, order.country_code);
+  const productsFcfa = Number(order.total_fcfa ?? 0);
+  const productsUsd = Number(order.total_usd ?? 0);
+  const deliveryFcfa = Number(order.delivery_fee_fcfa ?? 0);
+  const deliveryUsd = Number(order.delivery_fee_usd ?? 0);
+  if (directionCurrency(scope) === "FCFA") {
+    return `${(productsFcfa + deliveryFcfa).toLocaleString("fr-FR")} FCFA`;
+  }
+  return `$${(productsUsd + deliveryUsd).toFixed(2)}`;
+}
+
 /** Regroupement admin : Congo (Brazzaville + Pointe-Noire) sous « RD Congo ». */
 export const ADMIN_REPORT_REGIONS = [
   { key: "kinshasa", label: "Kinshasa", scopes: ["kinshasa"] as StaffDirection[] },

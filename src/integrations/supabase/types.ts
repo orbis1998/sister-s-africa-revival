@@ -23,6 +23,8 @@ export type Database = {
           can_manage_stock: boolean
           can_manage_users: boolean
           can_view_accounting: boolean
+          can_record_expenses: boolean
+          can_record_wholesale: boolean
           notes: string | null
           pos_ids: string[]
           updated_at: string
@@ -36,6 +38,8 @@ export type Database = {
           can_manage_stock?: boolean
           can_manage_users?: boolean
           can_view_accounting?: boolean
+          can_record_expenses?: boolean
+          can_record_wholesale?: boolean
           notes?: string | null
           pos_ids?: string[]
           updated_at?: string
@@ -49,6 +53,8 @@ export type Database = {
           can_manage_stock?: boolean
           can_manage_users?: boolean
           can_view_accounting?: boolean
+          can_record_expenses?: boolean
+          can_record_wholesale?: boolean
           notes?: string | null
           pos_ids?: string[]
           updated_at?: string

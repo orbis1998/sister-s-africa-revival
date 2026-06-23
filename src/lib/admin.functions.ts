@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { normalizeManagerPermissions } from "@/lib/permissions.functions";
 import type { StaffDirection } from "@/lib/staff-scope";
 
 type Role = "admin" | "manager" | "livreur" | "pos";
@@ -45,19 +46,13 @@ export const adminCreateUser = createServerFn({ method: "POST" })
     await supabaseAdmin.from("user_roles").delete().eq("user_id", uid);
     await supabaseAdmin.from("user_roles").insert({ user_id: uid, role: data.role });
     if (data.role === "manager") {
-      await supabaseAdmin.from("manager_permissions").upsert({
+      const perms = normalizeManagerPermissions(data.permissions);
+      const { error: permErr } = await supabaseAdmin.from("manager_permissions").upsert({
         user_id: uid,
-        can_manage_products: !!data.permissions?.can_manage_products,
-        can_manage_stock: !!data.permissions?.can_manage_stock,
-        can_manage_orders: !!data.permissions?.can_manage_orders,
-        can_manage_logistics: !!data.permissions?.can_manage_logistics,
-        can_view_accounting: !!data.permissions?.can_view_accounting,
-        can_record_wholesale: !!data.permissions?.can_record_wholesale,
-        can_record_expenses: !!data.permissions?.can_record_expenses,
-        can_manage_pos: !!data.permissions?.can_manage_pos,
-        can_manage_users: !!data.permissions?.can_manage_users,
+        ...perms,
         pos_ids: data.pos_ids ?? [],
-      });
+      }, { onConflict: "user_id" });
+      if (permErr) throw new Error(`Permissions manager : ${permErr.message}`);
     }
     if (data.role === "pos" && data.pos_id) {
       await supabaseAdmin.from("pos_accounts").upsert({ user_id: uid, pos_id: data.pos_id });
@@ -75,6 +70,7 @@ export const adminListUsers = createServerFn({ method: "GET" })
     const { data: profiles } = await supabaseAdmin.from("profiles").select("*").in("id", ids);
     const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id, role").in("user_id", ids);
     const { data: posAccounts } = await supabaseAdmin.from("pos_accounts").select("user_id, pos_id, points_of_sale(name)").in("user_id", ids);
+    const { data: managerPerms } = await supabaseAdmin.from("manager_permissions").select("*").in("user_id", ids);
     return users?.users.map((u) => ({
       id: u.id,
       email: u.email,
@@ -82,6 +78,7 @@ export const adminListUsers = createServerFn({ method: "GET" })
       profile: profiles?.find((p) => p.id === u.id) ?? null,
       roles: roles?.filter((r) => r.user_id === u.id).map((r) => r.role) ?? [],
       pos_account: posAccounts?.find((p) => p.user_id === u.id) ?? null,
+      manager_permissions: managerPerms?.find((p) => p.user_id === u.id) ?? null,
     })) ?? [];
   });
 

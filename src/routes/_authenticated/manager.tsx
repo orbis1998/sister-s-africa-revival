@@ -1,20 +1,32 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { createStaffExpense, createWholesaleSale, listStaffExpenses, listWholesaleSales } from "@/lib/finance.functions";
 import { listCommuneDeliveryFees, upsertCommuneDeliveryFees } from "@/lib/delivery.functions";
+import { getMyManagerPermissions } from "@/lib/permissions.functions";
 import { directionLabel, formatScopedMoney, directionDeliveryCurrency, directionCurrency } from "@/lib/staff-scope";
+import { supabase } from "@/integrations/supabase/client";
 import { formatVariantLabel } from "@/lib/product-variants";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ShoppingCart } from "lucide-react";
+import { Boxes, ClipboardList, HandCoins, Package, ShoppingCart, Wallet } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/manager")({
   component: ManagerDashboard,
 });
+
+const MODULE_LINKS = [
+  { perm: "can_manage_products" as const, label: "Produits", to: "/admin/products", icon: Package },
+  { perm: "can_manage_stock" as const, label: "Stock", to: "/admin/stock", icon: Boxes },
+  { perm: "can_manage_orders" as const, label: "Commandes", to: "/admin/logistics", icon: ClipboardList },
+  { perm: "can_manage_logistics" as const, label: "Logistique", to: "/admin/logistics", icon: ClipboardList },
+  { perm: "can_manage_pos" as const, label: "Caisse POS", to: "/pos", icon: ShoppingCart },
+  { perm: "can_record_wholesale" as const, label: "Vente en gros", to: "/admin/wholesale", icon: HandCoins, alsoNeeds: "can_view_accounting" as const },
+  { perm: "can_record_expenses" as const, label: "Dépenses", to: "/manager", icon: Wallet, anchor: "expenses" },
+  { perm: "can_view_accounting" as const, label: "Comptabilité POS", to: "/manager", icon: Wallet },
+];
 
 function ManagerDashboard() {
   const { user } = useAuth();
@@ -39,21 +51,37 @@ function ManagerDashboard() {
     payment_status: "pending",
     notes: "",
   });
+  const fetchManagerPerms = useServerFn(getMyManagerPermissions);
   const { data: profile } = useQuery({
     queryKey: ["manager-profile", user?.id],
     queryFn: async () => user ? (await supabase.from("profiles").select("city_scope").eq("id", user.id).maybeSingle()).data : null,
     enabled: !!user,
   });
-  const { data: managerPerms } = useQuery({
-    queryKey: ["manager-perms", user?.id],
+  const { data: managerPerms, isLoading: permsLoading } = useQuery({
+    queryKey: ["manager-permissions", user?.id],
     enabled: !!user,
-    queryFn: async () => (await supabase.from("manager_permissions").select("*").eq("user_id", user!.id).maybeSingle()).data,
+    queryFn: () => fetchManagerPerms({}),
+    staleTime: 30_000,
   });
 
   const canViewAccounting = !!managerPerms?.can_view_accounting;
-  const canWholesale = !!(canViewAccounting && managerPerms?.can_record_wholesale);
-  const canExpenses = !!(canViewAccounting && managerPerms?.can_record_expenses);
+  const canWholesale = !!(managerPerms?.can_record_wholesale && canViewAccounting);
+  const canExpenses = !!(managerPerms?.can_record_expenses && canViewAccounting);
   const canPos = !!managerPerms?.can_manage_pos;
+  const canLogistics = !!(managerPerms?.can_manage_logistics || managerPerms?.can_manage_orders);
+  const activeModules = useMemo(() => {
+    if (!managerPerms) return [];
+    const seen = new Set<string>();
+    return MODULE_LINKS.filter((mod) => {
+      if (mod.alsoNeeds && !managerPerms[mod.alsoNeeds]) return false;
+      if (!managerPerms[mod.perm]) return false;
+      const key = mod.to + (mod.anchor ?? "");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [managerPerms]);
+
   const posIds = (managerPerms?.pos_ids ?? []) as string[];
   const priceCurrency = directionCurrency(profile?.city_scope);
 
@@ -95,7 +123,7 @@ function ManagerDashboard() {
   });
   const { data: deliveryFees = [], refetch: refetchFees } = useQuery({
     queryKey: ["manager-delivery-fees", profile?.city_scope],
-    enabled: !!profile?.city_scope,
+    enabled: canLogistics && !!profile?.city_scope,
     queryFn: () => listFees({ data: { city_scope: profile!.city_scope! } }),
   });
   const [feeDraft, setFeeDraft] = useState<Record<string, { local: string }>>({});
@@ -245,6 +273,38 @@ function ManagerDashboard() {
         </Link>
       )}
 
+      {permsLoading ? (
+        <div className="mt-8 rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
+          Chargement de vos accès…
+        </div>
+      ) : !managerPerms ? (
+        <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-950">
+          Aucune permission enregistrée pour ce compte. Demandez à l&apos;administrateur de configurer vos accès depuis Utilisateurs.
+        </div>
+      ) : activeModules.length > 0 ? (
+        <div className="mt-8">
+          <h2 className="font-display text-2xl">Vos accès</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Modules activés par l&apos;administrateur.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {activeModules.map((mod) => (
+              <Link
+                key={mod.label}
+                to={mod.to as any}
+                hash={mod.anchor}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition hover:border-copper/40 hover:bg-copper/5"
+              >
+                <mod.icon className="h-5 w-5 text-copper" strokeWidth={1.5} />
+                <span className="font-medium text-espresso">{mod.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-8 rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
+          Aucun module activé. L&apos;administrateur peut activer vos accès depuis Utilisateurs.
+        </div>
+      )}
+
       {statCards.length > 0 ? (
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           {statCards.map((card) => (
@@ -254,11 +314,7 @@ function ManagerDashboard() {
             </div>
           ))}
         </div>
-      ) : (
-        <div className="mt-8 rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          Aucun module comptable activé. L'administrateur peut activer la comptabilité, le POS, les dépenses ou la vente en gros depuis Utilisateurs.
-        </div>
-      )}
+      ) : null}
 
       {canViewAccounting && posSales.length > 0 && (
         <div className="mt-8 rounded-2xl border border-border bg-card p-6">
@@ -274,8 +330,9 @@ function ManagerDashboard() {
         </div>
       )}
 
+      {canLogistics && (
       <div className="mt-8 rounded-2xl border border-border bg-card p-6">
-        <h2 className="font-display text-2xl">Frais de livraison Kinshasa</h2>
+        <h2 className="font-display text-2xl">Frais de livraison — {directionLabel(profile?.city_scope)}</h2>
         <p className="mt-1 text-xs text-muted-foreground">
           Fixez le prix de livraison en <strong>{deliveryCurrency}</strong> par commune et quartier/zone.
         </p>
@@ -313,6 +370,7 @@ function ManagerDashboard() {
           {feeMut.isPending ? "Enregistrement..." : "Enregistrer les frais de livraison"}
         </button>
       </div>
+      )}
 
       {canWholesale && (
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
@@ -390,7 +448,7 @@ function ManagerDashboard() {
       )}
 
       {canExpenses && (
-      <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+      <div id="expenses" className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-2xl border border-border bg-card p-6">
           <h2 className="font-display text-2xl">Signaler une dépense</h2>
           <div className="mt-5 grid gap-3">

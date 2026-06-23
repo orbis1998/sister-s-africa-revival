@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { listWholesaleSales } from "@/lib/finance.functions";
-import { ADMIN_REPORT_REGIONS, directionLabel, formatScopedMoney } from "@/lib/staff-scope";
+import { ADMIN_REPORT_REGIONS, directionLabel, formatRegionMoney, formatScopedMoney } from "@/lib/staff-scope";
 
 export const Route = createFileRoute("/_authenticated/admin/wholesale")({
   component: WholesaleAdminPage,
@@ -32,7 +32,7 @@ function WholesaleAdminPage() {
   });
 
   return (
-    <StaffShell title="Administration" requiredRole={["admin", "manager"]} requiredPermission={["can_view_accounting", "can_record_wholesale"]}>
+    <StaffShell title="Administration" requiredRole={["admin", "manager"]} requiredPermission={["can_view_accounting", "can_record_wholesale"]} requireAllPermissions>
       <span className="eyebrow">Commercial</span>
       <h1 className="font-display text-4xl mt-2">Ventes en gros</h1>
       <p className="mt-2 text-sm text-muted-foreground">
@@ -50,9 +50,8 @@ function WholesaleAdminPage() {
           <div key={row.region.key} className="rounded-2xl border border-border bg-card p-5">
             <h2 className="font-display text-xl">{row.region.label}</h2>
             <div className="mt-3 text-sm text-muted-foreground">{row.count} vente(s)</div>
-            <div className="mt-2 space-y-1 text-sm">
-              <div className="font-medium text-copper">${row.usd.toFixed(2)}</div>
-              <div className="text-muted-foreground">{row.fcfa.toLocaleString("fr-FR")} FCFA</div>
+            <div className="mt-2 font-medium text-copper text-sm">
+              {formatRegionMoney({ usd: row.usd, fcfa: row.fcfa }, row.region)}
             </div>
           </div>
         ))}

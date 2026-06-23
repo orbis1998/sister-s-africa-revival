@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { exportCompanyReport, exportCompanyReportPdf } from "@/lib/accounting.functions";
 import { listStaffExpenses, listWholesaleSales } from "@/lib/finance.functions";
-import { ADMIN_REPORT_REGIONS, directionFromCity, directionLabel } from "@/lib/staff-scope";
+import { ADMIN_REPORT_REGIONS, directionFromCity, formatOrderAmount, formatRegionMoney } from "@/lib/staff-scope";
 import { AlertTriangle, ClipboardList, DollarSign, Download, FileText, MessageSquare, Package, ShoppingCart, Store, TrendingUp } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
@@ -101,7 +101,11 @@ function AdminDashboard() {
   const posScopeById = Object.fromEntries((pos ?? []).map((p: any) => [p.id, directionFromCity(p.city)]));
   const salesWithScope = (sales ?? []).map((sale: any) => ({ ...sale, city_scope: posScopeById[sale.pos_id] ?? null }));
   const lowStock = (stock ?? []).filter((s: any) => s.quantity <= s.low_stock_threshold).length;
-  const deliveredOrders = (orders ?? []).filter((o: any) => o.status === "delivered");
+  const ordersWithScope = (orders ?? []).map((o: any) => ({
+    ...o,
+    city_scope: o.city_scope ?? directionFromCity(o.city, o.country_code),
+  }));
+  const deliveredOrders = ordersWithScope.filter((o: any) => o.status === "delivered");
   const revenueRows = [...deliveredOrders, ...salesWithScope, ...wholesaleSales];
   const revenue = sumMoney(revenueRows);
   const today = new Date();
@@ -216,12 +220,9 @@ function AdminDashboard() {
             <div key={row.region.key} className="rounded-2xl border border-border bg-cream/70 p-5">
               <h3 className="font-display text-xl">{row.region.label}</h3>
               <div className="mt-4 space-y-3 text-sm">
-                <Line label="Recettes USD" value={`$${row.revenue.usd.toFixed(2)}`} />
-                <Line label="Recettes FCFA" value={`${row.revenue.fcfa.toLocaleString("fr-FR")} FCFA`} />
-                <Line label="Dépenses USD" value={`$${row.expenses.usd.toFixed(2)}`} />
-                <Line label="Dépenses FCFA" value={`${row.expenses.fcfa.toLocaleString("fr-FR")} FCFA`} />
-                <Line label="Net USD" value={`$${row.net.usd.toFixed(2)}`} strong />
-                <Line label="Net FCFA" value={`${row.net.fcfa.toLocaleString("fr-FR")} FCFA`} />
+                <Line label="Recettes" value={formatRegionMoney(row.revenue, row.region)} />
+                <Line label="Dépenses" value={formatRegionMoney(row.expenses, row.region)} />
+                <Line label="Net" value={formatRegionMoney(row.net, row.region)} strong />
                 <Line label="Commandes livrées" value={row.orders} />
               </div>
             </div>
@@ -236,14 +237,14 @@ function AdminDashboard() {
             {(orders ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground">Aucune commande pour le moment.</p>
             ) : (
-              (orders ?? []).slice(0, 6).map((o: any) => (
+              ordersWithScope.slice(0, 6).map((o: any) => (
                 <div key={o.id} className="flex items-center justify-between gap-4 rounded-xl bg-cream/60 p-3">
                   <div>
                     <div className="font-medium text-espresso">{o.order_number}</div>
                     <div className="text-xs text-muted-foreground">{o.customer_name} · {o.city}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-display text-lg text-copper">{Number(o.total_fcfa).toLocaleString("fr-FR")} FCFA</div>
+                    <div className="font-display text-lg text-copper">{formatOrderAmount(o)}</div>
                     <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{o.status}</div>
                   </div>
                 </div>
