@@ -35,6 +35,7 @@ export const createOrder = createServerFn({ method: "POST" })
     customer_name: string; customer_phone: string;
     country_code: string; country_name: string;
     city: string; commune: string; address: string;
+    delivery_zone?: string;
     delivery_date?: string; delivery_time?: string;
     notes?: string;
     items: Array<{ slug: string; name: string; variantId: string; variantLabel: string; qty: number; priceUsd: number; priceFcfa: number }>;
@@ -55,6 +56,7 @@ export const createOrder = createServerFn({ method: "POST" })
       city_scope,
       pos_id,
       commune: data.commune,
+      delivery_zone: data.delivery_zone ?? "",
       address: data.address,
       delivery_date: data.delivery_date ?? null,
       delivery_time: data.delivery_time ?? null,
@@ -75,6 +77,7 @@ export const createStaffOrder = createServerFn({ method: "POST" })
     customer_name: string; customer_phone: string;
     country_code: string; country_name: string;
     city: string; commune: string; address: string;
+    delivery_zone?: string;
     delivery_date?: string; delivery_time?: string;
     notes?: string; assigned_to?: string | null;
     items?: Array<{ slug?: string; name: string; variantId?: string; variantLabel?: string; qty: number; priceUsd?: number; priceFcfa?: number }>;
@@ -110,6 +113,7 @@ export const createStaffOrder = createServerFn({ method: "POST" })
       city_scope,
       pos_id,
       commune: data.commune,
+      delivery_zone: data.delivery_zone ?? "",
       address: data.address,
       delivery_date: data.delivery_date ?? null,
       delivery_time: data.delivery_time ?? null,

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/lib/cart";
-import { countries, findCountry } from "@/lib/locations";
+import { countries, findCountry, communeHasZones, communeZones, deliveryLocationLabel } from "@/lib/locations";
 import { formatDeliveryFeeByCountry } from "@/lib/staff-scope";
 import { formatCheckoutCollect, formatLineTotal, productUnitPrice, type MarketCountry } from "@/lib/market";
 import { useMarket } from "@/lib/market-context";
@@ -28,6 +28,7 @@ const schema = z.object({
   countryCode: z.enum(["CD", "CG"]),
   city: z.string().min(1, "Ville requise"),
   commune: z.string().min(1, "Commune requise"),
+  deliveryZone: z.string().optional(),
   address: z.string().trim().min(3, "Adresse requise").max(300),
   deliveryDate: z.string().min(1, "Jour de livraison requis"),
   deliveryTime: z.string().min(1, "Heure de livraison requise"),
@@ -59,6 +60,7 @@ function CheckoutPage() {
     countryCode: "CD" as "CD" | "CG",
     city: "",
     commune: "",
+    deliveryZone: "",
     address: "",
     deliveryDate: minDeliveryDate,
     deliveryTime: "",
@@ -77,6 +79,10 @@ function CheckoutPage() {
   }));
   const collect = formatCheckoutCollect(pricingItems, market, deliveryFee.fee_fcfa);
 
+  const cityObj = country.cities.find((c) => c.name === form.city);
+  const selectedZones = communeZones(cityObj, form.commune);
+  const needsZone = communeHasZones(cityObj, form.commune);
+
   const marketSynced = useRef(false);
 
   useEffect(() => {
@@ -94,16 +100,26 @@ function CheckoutPage() {
       setDeliveryFee({ fee_fcfa: 0, fee_usd: 0 });
       return;
     }
+    const needsZone = communeHasZones(cityObj, form.commune);
+    if (needsZone && !form.deliveryZone) {
+      setDeliveryFee({ fee_fcfa: 0, fee_usd: 0 });
+      return;
+    }
     let cancelled = false;
     setFeeLoading(true);
-    lookupFee({ data: { country_code: form.countryCode, city: form.city, commune: form.commune } })
+    lookupFee({
+      data: {
+        country_code: form.countryCode,
+        city: form.city,
+        commune: form.commune,
+        zone: form.deliveryZone || undefined,
+      },
+    })
       .then((fee) => { if (!cancelled) setDeliveryFee(fee); })
       .catch(() => { if (!cancelled) setDeliveryFee({ fee_fcfa: 0, fee_usd: 0 }); })
       .finally(() => { if (!cancelled) setFeeLoading(false); });
     return () => { cancelled = true; };
-  }, [form.countryCode, form.city, form.commune, lookupFee]);
-
-  const cityObj = country.cities.find((c) => c.name === form.city);
+  }, [form.countryCode, form.city, form.commune, form.deliveryZone, lookupFee, cityObj, needsZone]);
 
   function update<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -118,6 +134,10 @@ function CheckoutPage() {
     const parsed = schema.safeParse(form);
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message);
+      return;
+    }
+    if (parsed.data.commune && communeHasZones(cityObj, parsed.data.commune) && !parsed.data.deliveryZone?.trim()) {
+      toast.error("Sélectionnez un quartier / zone");
       return;
     }
     if (parsed.data.deliveryDate < minDeliveryDate) {
@@ -135,6 +155,7 @@ function CheckoutPage() {
         country_name: country.name,
         city: parsed.data.city,
         commune: parsed.data.commune,
+        delivery_zone: parsed.data.deliveryZone?.trim() || "",
         address: parsed.data.address,
         delivery_date: parsed.data.deliveryDate,
         delivery_time: parsed.data.deliveryTime,
@@ -164,7 +185,7 @@ function CheckoutPage() {
     lines.push(`• Téléphone : ${parsed.data.phone}`);
     lines.push(`• Pays : ${country.name}`);
     lines.push(`• Ville : ${parsed.data.city}`);
-    lines.push(`• Commune : ${parsed.data.commune}`);
+    lines.push(`• Commune : ${deliveryLocationLabel(parsed.data.commune, parsed.data.deliveryZone)}`);
     lines.push(`• Adresse : ${parsed.data.address}`);
     lines.push(`• Livraison : ${new Date(parsed.data.deliveryDate).toLocaleDateString("fr-FR")} à ${parsed.data.deliveryTime}`);
     if (parsed.data.notes) lines.push(`• Notes : ${parsed.data.notes}`);
@@ -181,11 +202,11 @@ function CheckoutPage() {
     const url = `https://wa.me/${whatsappNumber}?text=${message}`;
 
     toast.success("Commande enregistrée — redirection WhatsApp…");
-    setTimeout(() => {
-      window.open(url, "_blank");
-      clear();
-      navigate({ to: "/" });
-    }, 600);
+    clear();
+    setSubmitting(false);
+    // iOS Safari blocks window.open after async — direct navigation works reliably
+    window.location.href = url;
+    return;
   }
 
   return (
@@ -228,6 +249,7 @@ function CheckoutPage() {
                     update("countryCode", e.target.value as "CD" | "CG");
                     update("city", "");
                     update("commune", "");
+                    update("deliveryZone", "");
                   }}
                   className="input"
                 >
@@ -239,7 +261,7 @@ function CheckoutPage() {
               <Field label="Ville">
                 <select
                   value={form.city}
-                  onChange={(e) => { update("city", e.target.value); update("commune", ""); }}
+                  onChange={(e) => { update("city", e.target.value); update("commune", ""); update("deliveryZone", ""); }}
                   required
                   className="input"
                 >
@@ -249,27 +271,44 @@ function CheckoutPage() {
                   ))}
                 </select>
               </Field>
-              <Field label="Commune / Quartier">
+              <Field label="Commune">
                 <select
                   value={form.commune}
-                  onChange={(e) => update("commune", e.target.value)}
+                  onChange={(e) => { update("commune", e.target.value); update("deliveryZone", ""); }}
                   required
                   disabled={!cityObj}
                   className="input"
                 >
                   <option value="">{cityObj ? "Sélectionner…" : "Choisissez d'abord la ville"}</option>
                   {cityObj?.communes.map((cm) => (
-                    <option key={cm} value={cm}>{cm}</option>
+                    <option key={cm.name} value={cm.name}>{cm.name}</option>
                   ))}
                 </select>
-                {form.commune && (
-                  <span className="mt-1 block text-[11px] text-copper">
+              </Field>
+              {needsZone && (
+                <Field label="Quartier / Zone">
+                  <select
+                    value={form.deliveryZone}
+                    onChange={(e) => update("deliveryZone", e.target.value)}
+                    required
+                    className="input"
+                  >
+                    <option value="">Sélectionner…</option>
+                    {selectedZones.map((zone) => (
+                      <option key={zone} value={zone}>{zone}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              {(form.commune && (!needsZone || form.deliveryZone)) && (
+                <div className="sm:col-span-2">
+                  <span className="block text-[11px] text-copper">
                     {feeLoading
                       ? "Calcul des frais de livraison…"
                       : `Livraison : ${formatDeliveryFeeByCountry(deliveryFee.fee_fcfa, form.countryCode)}`}
                   </span>
-                )}
-              </Field>
+                </div>
+              )}
               <Field label="Adresse précise">
                 <input
                   value={form.address}

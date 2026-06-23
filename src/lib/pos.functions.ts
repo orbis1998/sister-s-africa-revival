@@ -1,6 +1,41 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+async function assertPosSaleAccess(
+  supabaseAdmin: any,
+  userId: string,
+  roles: string[],
+  posId: string,
+) {
+  if (roles.includes("admin")) return;
+
+  if (roles.includes("pos")) {
+    const { data: assignment } = await supabaseAdmin
+      .from("pos_accounts")
+      .select("pos_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!assignment || assignment.pos_id !== posId) {
+      throw new Error("Forbidden: point de vente non autorisé");
+    }
+    return;
+  }
+
+  if (roles.includes("manager")) {
+    const { data: perms } = await supabaseAdmin
+      .from("manager_permissions")
+      .select("can_manage_pos, pos_ids")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!perms?.can_manage_pos) throw new Error("Forbidden: accès POS non autorisé");
+    const allowed = (perms.pos_ids ?? []) as string[];
+    if (!allowed.includes(posId)) throw new Error("Forbidden: point de vente non autorisé");
+    return;
+  }
+
+  throw new Error("Forbidden");
+}
+
 export const createPosSale = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
@@ -27,20 +62,11 @@ export const createPosSale = createServerFn({ method: "POST" })
 
     const { data: roles } = await ctx.supabase.from("user_roles").select("role").eq("user_id", ctx.userId);
     const roleList = (roles ?? []).map((r: any) => r.role as string);
-    if (!roleList.includes("pos") && !roleList.includes("admin")) {
+    if (!roleList.some((r) => ["pos", "manager", "admin"].includes(r))) {
       throw new Error("Forbidden");
     }
 
-    if (!roleList.includes("admin")) {
-      const { data: assignment } = await supabaseAdmin
-        .from("pos_accounts")
-        .select("pos_id")
-        .eq("user_id", ctx.userId)
-        .maybeSingle();
-      if (!assignment || assignment.pos_id !== data.pos_id) {
-        throw new Error("Forbidden: point de vente non autorisé");
-      }
-    }
+    await assertPosSaleAccess(supabaseAdmin, ctx.userId, roleList, data.pos_id);
 
     const { data: saleId, error } = await supabaseAdmin.rpc("record_pos_sale", {
       p_pos_id: data.pos_id,

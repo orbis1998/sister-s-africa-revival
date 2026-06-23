@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listOrders, listDrivers, assignOrder, updateOrderStatus, createStaffOrder } from "@/lib/orders.functions";
 import { directionFromCity, formatScopedMoney, directionCurrency, formatDeliveryFee } from "@/lib/staff-scope";
 import { formatCollectLabel } from "@/lib/seo";
-import { countries, findCountry } from "@/lib/locations";
+import { countries, findCountry, communeHasZones, communeZones, deliveryLocationLabel } from "@/lib/locations";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, MessageCircle, Phone, MapPin, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -60,6 +60,7 @@ function emptyManualOrder(minDeliveryDate: string) {
     country_code: "CD",
     city: "Kinshasa",
     commune: "",
+    delivery_zone: "",
     address: "",
     delivery_date: minDeliveryDate,
     delivery_time: "",
@@ -162,19 +163,33 @@ function LogisticsPage() {
     [manualTotals, deliveryFee, manual.country_code],
   );
 
+  const manualZones = communeZones(manualCity, manual.commune);
+  const manualNeedsZone = communeHasZones(manualCity, manual.commune);
+
   useEffect(() => {
     if (!manual.city || !manual.commune) {
       setDeliveryFee(0);
       return;
     }
+    if (manualNeedsZone && !manual.delivery_zone) {
+      setDeliveryFee(0);
+      return;
+    }
     let cancelled = false;
     setFeeLoading(true);
-    lookupFee({ data: { country_code: manual.country_code, city: manual.city, commune: manual.commune } })
+    lookupFee({
+      data: {
+        country_code: manual.country_code,
+        city: manual.city,
+        commune: manual.commune,
+        zone: manual.delivery_zone || undefined,
+      },
+    })
       .then((fee) => { if (!cancelled) setDeliveryFee(fee.fee_fcfa ?? 0); })
       .catch(() => { if (!cancelled) setDeliveryFee(0); })
       .finally(() => { if (!cancelled) setFeeLoading(false); });
     return () => { cancelled = true; };
-  }, [manual.country_code, manual.city, manual.commune, lookupFee]);
+  }, [manual.country_code, manual.city, manual.commune, manual.delivery_zone, manualNeedsZone, lookupFee]);
 
   const assignMut = useMutation({
     mutationFn: (v: { order_id: string; driver_id: string | null }) => assign({ data: v }),
@@ -228,25 +243,37 @@ function LogisticsPage() {
             <select value={manual.country_code} onChange={(e) => {
               const countryCode = e.target.value;
               const country = findCountry(countryCode) ?? countries[0];
-              setManual({ ...manual, country_code: countryCode, city: country.cities[0]?.name ?? "", commune: "" });
+              setManual({ ...manual, country_code: countryCode, city: country.cities[0]?.name ?? "", commune: "", delivery_zone: "" });
             }} className="input-admin">
               {countries.map((country) => <option key={country.code} value={country.code}>{country.name}</option>)}
             </select>
-            <select value={manual.city} onChange={(e) => setManual({ ...manual, city: e.target.value, commune: "" })} className="input-admin">
+            <select value={manual.city} onChange={(e) => setManual({ ...manual, city: e.target.value, commune: "", delivery_zone: "" })} className="input-admin">
               <option value="">Sélectionner une ville…</option>
               {(findCountry(manual.country_code)?.cities ?? []).map((city) => <option key={city.name} value={city.name}>{city.name}</option>)}
             </select>
             <select
               value={manual.commune}
-              onChange={(e) => setManual({ ...manual, commune: e.target.value })}
+              onChange={(e) => setManual({ ...manual, commune: e.target.value, delivery_zone: "" })}
               disabled={!manualCity}
               className="input-admin"
             >
               <option value="">{manualCity ? "Sélectionner une commune…" : "Choisissez d'abord la ville"}</option>
               {manualCity?.communes.map((commune) => (
-                <option key={commune} value={commune}>{commune}</option>
+                <option key={commune.name} value={commune.name}>{commune.name}</option>
               ))}
             </select>
+            {manualNeedsZone && (
+              <select
+                value={manual.delivery_zone}
+                onChange={(e) => setManual({ ...manual, delivery_zone: e.target.value })}
+                className="input-admin"
+              >
+                <option value="">Sélectionner un quartier / zone…</option>
+                {manualZones.map((zone) => (
+                  <option key={zone} value={zone}>{zone}</option>
+                ))}
+              </select>
+            )}
             <input placeholder="Adresse précise" value={manual.address} onChange={(e) => setManual({ ...manual, address: e.target.value })} className="input-admin" />
             <input type="date" min={minDeliveryDate} value={manual.delivery_date} onChange={(e) => setManual({ ...manual, delivery_date: e.target.value })} className="input-admin" />
             <input type="time" value={manual.delivery_time} onChange={(e) => setManual({ ...manual, delivery_time: e.target.value })} className="input-admin" />
@@ -355,7 +382,7 @@ function LogisticsPage() {
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">
-                  Livraison{manual.commune ? ` (${manual.commune})` : ""}
+                  Livraison{manual.commune ? ` (${deliveryLocationLabel(manual.commune, manual.delivery_zone)})` : ""}
                 </span>
                 <strong>{feeLoading ? "Calcul…" : manualSummary.deliveryLabel}</strong>
               </div>
@@ -369,7 +396,7 @@ function LogisticsPage() {
             <button className="btn-ghost" onClick={() => setManualOpen(false)}>Annuler</button>
             <button
               className="btn-hero"
-              disabled={createMut.isPending || manual.items.length === 0 || !manual.commune || !manual.city || !manual.customer_name.trim()}
+              disabled={createMut.isPending || manual.items.length === 0 || !manual.commune || !manual.city || !manual.customer_name.trim() || (manualNeedsZone && !manual.delivery_zone)}
               onClick={() => {
                 const country = findCountry(manual.country_code)!;
                 createMut.mutate({
@@ -434,7 +461,7 @@ function LogisticsPage() {
                   </div>
                   <div>
                     <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Livraison</div>
-                    <div className="text-espresso flex items-start gap-1"><MapPin className="w-3 h-3 mt-1 shrink-0" /><span>{o.address}<br/>{o.commune}, {o.city} — {o.country_name}</span></div>
+                    <div className="text-espresso flex items-start gap-1"><MapPin className="w-3 h-3 mt-1 shrink-0" /><span>{o.address}<br/>{deliveryLocationLabel(o.commune, o.delivery_zone)}, {o.city} — {o.country_name}</span></div>
                     <div className="mt-1 text-xs text-muted-foreground">{deliveryLabel(o)}</div>
                   </div>
                   <div>

@@ -53,6 +53,7 @@ export const adminCreateUser = createServerFn({ method: "POST" })
         can_manage_logistics: !!data.permissions?.can_manage_logistics,
         can_view_accounting: !!data.permissions?.can_view_accounting,
         can_record_wholesale: !!data.permissions?.can_record_wholesale,
+        can_record_expenses: !!data.permissions?.can_record_expenses,
         can_manage_pos: !!data.permissions?.can_manage_pos,
         can_manage_users: !!data.permissions?.can_manage_users,
         pos_ids: data.pos_ids ?? [],

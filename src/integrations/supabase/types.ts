@@ -122,6 +122,7 @@ export type Database = {
           id: string
           updated_at: string
           updated_by: string | null
+          zone: string
         }
         Insert: {
           city: string
@@ -134,6 +135,7 @@ export type Database = {
           id?: string
           updated_at?: string
           updated_by?: string | null
+          zone?: string
         }
         Update: {
           city?: string
@@ -146,6 +148,7 @@ export type Database = {
           id?: string
           updated_at?: string
           updated_by?: string | null
+          zone?: string
         }
         Relationships: []
       }
@@ -256,6 +259,7 @@ export type Database = {
           delivered_at: string | null
           delivery_fee_fcfa: number
           delivery_fee_usd: number
+          delivery_zone: string
           id: string
           items: Json
           notes: string | null
@@ -281,6 +285,7 @@ export type Database = {
           delivered_at?: string | null
           delivery_fee_fcfa?: number
           delivery_fee_usd?: number
+          delivery_zone?: string
           id?: string
           items?: Json
           notes?: string | null
@@ -306,6 +311,7 @@ export type Database = {
           delivered_at?: string | null
           delivery_fee_fcfa?: number
           delivery_fee_usd?: number
+          delivery_zone?: string
           id?: string
           items?: Json
           notes?: string | null

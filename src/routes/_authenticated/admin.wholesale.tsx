@@ -40,8 +40,8 @@ function WholesaleAdminPage() {
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <Stat label="Total USD" value={`$${totals.usd.toFixed(2)}`} />
-        <Stat label="Total FCFA" value={`${totals.fcfa.toLocaleString("fr-FR")} FCFA`} />
+        <Stat label="Total USD (RDC + export)" value={`$${totals.usd.toFixed(2)}`} />
+        <Stat label="Total FCFA (Congo)" value={`${totals.fcfa.toLocaleString("fr-FR")} FCFA`} />
         <Stat label="Nombre de ventes" value={sales.length} />
       </div>
 

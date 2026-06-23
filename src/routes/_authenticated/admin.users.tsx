@@ -19,6 +19,7 @@ const permKeys = [
   ["can_manage_orders", "Commandes"],
   ["can_manage_logistics", "Logistique"],
   ["can_view_accounting", "Comptabilité"],
+  ["can_record_expenses", "Dépenses"],
   ["can_record_wholesale", "Vente en gros"],
   ["can_manage_pos", "POS"],
   ["can_manage_users", "Utilisateurs"],
