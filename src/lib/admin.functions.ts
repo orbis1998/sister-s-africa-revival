@@ -60,6 +60,136 @@ export const adminCreateUser = createServerFn({ method: "POST" })
     return { ok: true, user_id: uid };
   });
 
+export const adminUpdateUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    user_id: string;
+    email?: string;
+    password?: string;
+    full_name?: string;
+    phone?: string;
+    badge_id?: string;
+    city_scope?: StaffDirection | "";
+    role?: Role;
+    permissions?: Record<string, boolean>;
+    pos_ids?: string[];
+    pos_id?: string;
+  }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context as any);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const uid = data.user_id;
+
+    const authPatch: { email?: string; password?: string; user_metadata?: Record<string, string> } = {};
+    if (data.email?.trim()) authPatch.email = data.email.trim();
+    if (data.password?.trim()) authPatch.password = data.password.trim();
+    if (data.full_name !== undefined || data.phone !== undefined) {
+      authPatch.user_metadata = {
+        ...(data.full_name !== undefined ? { full_name: data.full_name } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone ?? "" } : {}),
+      };
+    }
+    if (Object.keys(authPatch).length) {
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(uid, authPatch);
+      if (error) throw new Error(error.message);
+    }
+
+    const profilePatch: Record<string, unknown> = {};
+    if (data.full_name !== undefined) profilePatch.full_name = data.full_name;
+    if (data.phone !== undefined) profilePatch.phone = data.phone || null;
+    if (data.badge_id !== undefined) profilePatch.badge_id = data.badge_id?.trim() || null;
+    if (data.city_scope !== undefined) profilePatch.city_scope = data.city_scope || null;
+    if (Object.keys(profilePatch).length) {
+      const { error } = await supabaseAdmin.from("profiles").update(profilePatch).eq("id", uid);
+      if (error) throw new Error(error.message);
+    }
+
+    if (data.role) {
+      if (data.role === "manager" && !(data.pos_ids?.length)) {
+        throw new Error("Un manager doit être associé à au moins un point de vente");
+      }
+      if (data.role === "livreur" && !data.pos_id) {
+        throw new Error("Un livreur doit être associé à un point de vente");
+      }
+      await supabaseAdmin.from("user_roles").delete().eq("user_id", uid);
+      const { error: roleErr } = await supabaseAdmin.from("user_roles").insert({ user_id: uid, role: data.role });
+      if (roleErr) throw new Error(roleErr.message);
+
+      await supabaseAdmin.from("manager_permissions").delete().eq("user_id", uid);
+      await supabaseAdmin.from("pos_accounts").delete().eq("user_id", uid);
+
+      if (data.role === "manager") {
+        const perms = normalizeManagerPermissions(data.permissions);
+        const { error: permErr } = await supabaseAdmin.from("manager_permissions").upsert({
+          user_id: uid,
+          ...perms,
+          pos_ids: data.pos_ids ?? [],
+        }, { onConflict: "user_id" });
+        if (permErr) throw new Error(`Permissions manager : ${permErr.message}`);
+        await supabaseAdmin.from("profiles").update({ pos_id: null }).eq("id", uid);
+      } else if (data.role === "livreur") {
+        await supabaseAdmin.from("profiles").update({ pos_id: data.pos_id || null }).eq("id", uid);
+      } else if (data.role === "pos") {
+        if (data.pos_id) {
+          await supabaseAdmin.from("pos_accounts").upsert({ user_id: uid, pos_id: data.pos_id });
+        }
+        await supabaseAdmin.from("profiles").update({ pos_id: null }).eq("id", uid);
+      } else {
+        await supabaseAdmin.from("profiles").update({ pos_id: null }).eq("id", uid);
+      }
+    } else if (data.permissions !== undefined || data.pos_ids !== undefined) {
+      const { data: roles } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", uid);
+      const isManager = (roles ?? []).some((r) => r.role === "manager");
+      if (isManager) {
+        if (!(data.pos_ids?.length)) throw new Error("Au moins un point de vente est requis pour un manager");
+        const perms = normalizeManagerPermissions(data.permissions);
+        const { error: permErr } = await supabaseAdmin.from("manager_permissions").upsert({
+          user_id: uid,
+          ...perms,
+          pos_ids: data.pos_ids ?? [],
+        }, { onConflict: "user_id" });
+        if (permErr) throw new Error(`Permissions manager : ${permErr.message}`);
+      }
+    }
+
+    if (data.role === undefined && data.pos_id !== undefined) {
+      const { data: roles } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", uid);
+      const roleList = (roles ?? []).map((r) => r.role as Role);
+      if (roleList.includes("livreur")) {
+        await supabaseAdmin.from("profiles").update({ pos_id: data.pos_id || null }).eq("id", uid);
+      }
+      if (roleList.includes("pos")) {
+        await supabaseAdmin.from("pos_accounts").delete().eq("user_id", uid);
+        if (data.pos_id) await supabaseAdmin.from("pos_accounts").upsert({ user_id: uid, pos_id: data.pos_id });
+      }
+    }
+
+    return { ok: true };
+  });
+
+export const adminListPosSales = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { pos_id: string; limit?: number }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context as any);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: sales, error } = await supabaseAdmin
+      .from("pos_sales")
+      .select("*")
+      .eq("pos_id", data.pos_id)
+      .order("created_at", { ascending: false })
+      .limit(data.limit ?? 100);
+    if (error) throw new Error(error.message);
+    const sellerIds = [...new Set((sales ?? []).map((s: any) => s.sold_by).filter(Boolean))];
+    const { data: profiles } = sellerIds.length
+      ? await supabaseAdmin.from("profiles").select("id, full_name, badge_id, phone").in("id", sellerIds)
+      : { data: [] as any[] };
+    return (sales ?? []).map((sale: any) => ({
+      ...sale,
+      seller: profiles?.find((p: any) => p.id === sale.sold_by) ?? null,
+    }));
+  });
+
 export const adminListUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
