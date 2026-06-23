@@ -371,16 +371,20 @@ export const adminUpsertPOS = createServerFn({ method: "POST" })
   .inputValidator((d: {
     id?: string; name: string; city?: string; city_scope?: StaffDirection | "";
     address?: string; phone?: string; manager_user_id?: string | null;
+    manager_user_ids?: string[];
   }) => d)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as any);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { manager_user_id, ...posPayload } = data;
+    const selectedManagerIds = [...new Set((data.manager_user_ids ?? []).filter(Boolean))];
+    const { manager_user_id, manager_user_ids: _ignored, ...posPayload } = data;
     let savedId = posPayload.id as string | undefined;
+    const primaryManagerId = selectedManagerIds[0] ?? manager_user_id ?? null;
+
     if (posPayload.id) {
       const { error } = await supabaseAdmin.from("points_of_sale").update({
         ...posPayload,
-        manager_user_id: manager_user_id || null,
+        manager_user_id: primaryManagerId,
       }).eq("id", posPayload.id);
       if (error) throw new Error(error.message);
     } else {
@@ -390,38 +394,118 @@ export const adminUpsertPOS = createServerFn({ method: "POST" })
         city_scope: posPayload.city_scope || null,
         address: posPayload.address,
         phone: posPayload.phone,
-        manager_user_id: manager_user_id || null,
+        manager_user_id: primaryManagerId,
       }).select("id").single();
       if (error) throw new Error(error.message);
       savedId = inserted.id;
     }
 
-    if (manager_user_id && savedId) {
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("city_scope")
-        .eq("id", manager_user_id)
-        .maybeSingle();
-      if (posPayload.city_scope && !profile?.city_scope) {
-        await supabaseAdmin.from("profiles").update({ city_scope: posPayload.city_scope }).eq("id", manager_user_id);
-      }
-      const { data: perms } = await supabaseAdmin
-        .from("manager_permissions")
-        .select("pos_ids")
-        .eq("user_id", manager_user_id)
-        .maybeSingle();
-      const current = new Set((perms?.pos_ids ?? []) as string[]);
-      current.add(savedId);
-      if (perms) {
-        await supabaseAdmin.from("manager_permissions").update({ pos_ids: [...current] }).eq("user_id", manager_user_id);
-      } else {
-        await supabaseAdmin.from("manager_permissions").insert({
-          user_id: manager_user_id,
-          pos_ids: [...current],
-        });
-      }
+    if (savedId) {
+      await syncPosManagers(supabaseAdmin, savedId, posPayload.city_scope || null, selectedManagerIds);
     }
     return { ok: true, id: savedId };
+  });
+
+async function syncPosManagers(
+  supabaseAdmin: any,
+  posId: string,
+  cityScope: string | null,
+  selectedManagerIds: string[],
+) {
+  if (selectedManagerIds.length) {
+    const { data: profiles } = await supabaseAdmin
+      .from("profiles")
+      .select("id, city_scope, full_name")
+      .in("id", selectedManagerIds);
+    const { data: permsList } = await supabaseAdmin
+      .from("manager_permissions")
+      .select("user_id, pos_ids, can_manage_pos")
+      .in("user_id", selectedManagerIds);
+
+    for (const userId of selectedManagerIds) {
+      const profile = profiles?.find((p: any) => p.id === userId);
+      const perms = permsList?.find((p: any) => p.user_id === userId);
+      if (!perms?.can_manage_pos) {
+        throw new Error(`Permission POS manquante pour ${profile?.full_name ?? "ce manager"}`);
+      }
+      if (cityScope && profile?.city_scope && profile.city_scope !== cityScope) {
+        throw new Error(`${profile.full_name ?? "Manager"} n'est pas de cette direction`);
+      }
+      if (cityScope && !profile?.city_scope) {
+        await supabaseAdmin.from("profiles").update({ city_scope: cityScope }).eq("id", userId);
+      }
+    }
+  }
+
+  const { data: allPerms } = await supabaseAdmin.from("manager_permissions").select("user_id, pos_ids");
+  const currentlyLinked = (allPerms ?? [])
+    .filter((row: any) => (row.pos_ids ?? []).includes(posId))
+    .map((row: any) => row.user_id as string);
+
+  const toAdd = selectedManagerIds.filter((id) => !currentlyLinked.includes(id));
+  const toRemove = currentlyLinked.filter((id) => !selectedManagerIds.includes(id));
+
+  for (const userId of toAdd) {
+    const { data: perms } = await supabaseAdmin
+      .from("manager_permissions")
+      .select("pos_ids")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const current = new Set((perms?.pos_ids ?? []) as string[]);
+    current.add(posId);
+    const { error } = await supabaseAdmin
+      .from("manager_permissions")
+      .update({ pos_ids: [...current] })
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+  }
+
+  for (const userId of toRemove) {
+    const { data: perms } = await supabaseAdmin
+      .from("manager_permissions")
+      .select("pos_ids")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const next = ((perms?.pos_ids ?? []) as string[]).filter((id) => id !== posId);
+    const { error } = await supabaseAdmin
+      .from("manager_permissions")
+      .update({ pos_ids: next })
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+  }
+}
+
+export const adminListPosManagers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { pos_id?: string; city_scope?: string }) => d ?? {})
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context as any);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id").eq("role", "manager");
+    const managerIds = (roles ?? []).map((r: any) => r.user_id);
+    if (!managerIds.length) return [];
+
+    const [{ data: profiles }, { data: perms }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("id, full_name, city_scope, badge_id").in("id", managerIds),
+      supabaseAdmin.from("manager_permissions").select("user_id, pos_ids, can_manage_pos").in("user_id", managerIds),
+    ]);
+
+    return (profiles ?? [])
+      .map((profile: any) => {
+        const permission = perms?.find((p: any) => p.user_id === profile.id);
+        const posIds = (permission?.pos_ids ?? []) as string[];
+        return {
+          id: profile.id,
+          full_name: profile.full_name,
+          city_scope: profile.city_scope,
+          badge_id: profile.badge_id,
+          can_manage_pos: !!permission?.can_manage_pos,
+          assigned: data.pos_id ? posIds.includes(data.pos_id) : false,
+        };
+      })
+      .filter((row) => row.can_manage_pos)
+      .filter((row) => !data.city_scope || !row.city_scope || row.city_scope === data.city_scope)
+      .sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? "", "fr"));
   });
 
 export const adminListReviews = createServerFn({ method: "GET" })
