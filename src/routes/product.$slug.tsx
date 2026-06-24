@@ -188,6 +188,17 @@ function ProductPage() {
             </div>
           )}
 
+          <div className="flex items-center gap-3 mb-8">
+            <div className="flex items-center border border-border rounded-sm">
+              <button type="button" disabled={outOfStock || qty <= 1} onClick={() => setQty((q) => Math.max(1, q - 1))} className="px-4 py-3 text-espresso hover:text-copper disabled:opacity-40">−</button>
+              <span className="px-4 text-sm w-10 text-center">{qty}</span>
+              <button type="button" disabled={outOfStock || qty >= remaining} onClick={() => setQty((q) => Math.min(remaining, q + 1))} className="px-4 py-3 text-espresso hover:text-copper disabled:opacity-40">+</button>
+            </div>
+            <button type="button" onClick={addToCart} disabled={outOfStock || remaining <= 0} className="btn-hero flex-1 disabled:opacity-50">
+              <ShoppingBag className="w-4 h-4" /> {outOfStock ? "Fini en stock" : "Ajouter au panier"}
+            </button>
+          </div>
+
           {(product.content_html || product.description) && (
             <div className="mb-8">
               {product.content_html ? (
@@ -198,13 +209,8 @@ function ProductPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-3 mb-8">
-            <div className="flex items-center border border-border rounded-sm">
-              <button type="button" disabled={outOfStock || qty <= 1} onClick={() => setQty((q) => Math.max(1, q - 1))} className="px-4 py-3 text-espresso hover:text-copper disabled:opacity-40">−</button>
-              <span className="px-4 text-sm w-10 text-center">{qty}</span>
-              <button type="button" disabled={outOfStock || qty >= remaining} onClick={() => setQty((q) => Math.min(remaining, q + 1))} className="px-4 py-3 text-espresso hover:text-copper disabled:opacity-40">+</button>
-            </div>
-            <button type="button" onClick={addToCart} disabled={outOfStock || remaining <= 0} className="btn-hero flex-1 disabled:opacity-50">
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={addToCart} disabled={outOfStock || remaining <= 0} className="btn-hero w-full disabled:opacity-50">
               <ShoppingBag className="w-4 h-4" /> {outOfStock ? "Fini en stock" : "Ajouter au panier"}
             </button>
           </div>
