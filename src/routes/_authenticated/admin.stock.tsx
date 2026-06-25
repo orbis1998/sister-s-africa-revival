@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { adminSetStock } from "@/lib/admin.functions";
 import { formatVariantLabel } from "@/lib/product-variants";
 import { useAuth } from "@/lib/auth";
+import { formatScopedMoney } from "@/lib/staff-scope";
 
 type StockRow = {
   id: string;
@@ -51,6 +52,12 @@ function StockPage() {
       return data;
     },
   });
+  const { data: profile } = useQuery({
+    queryKey: ["manager-stock-profile", user?.id],
+    enabled: !!user && !isAdmin,
+    queryFn: async () => (await supabase.from("profiles").select("city_scope").eq("id", user!.id).maybeSingle()).data,
+  });
+  const priceScope = isAdmin ? undefined : profile?.city_scope;
   const { data: products = [] } = useQuery({
     queryKey: ["admin-all-products"],
     queryFn: async () => (await supabase.from("products").select("id, name").order("name")).data ?? [] as ProductRow[],
@@ -130,9 +137,7 @@ function StockPage() {
         {selectedPos && (
           <div className="rounded-2xl border border-border bg-card px-5 py-3 text-sm">
             <span className="text-muted-foreground">Valeur estimée du POS : </span>
-            <strong className="text-copper">${estimatedValue.usd.toFixed(2)}</strong>
-            <span className="text-muted-foreground"> · </span>
-            <strong>{estimatedValue.fcfa.toLocaleString("fr-FR")} FCFA</strong>
+            <strong className="text-copper">{formatScopedMoney({ total_usd: estimatedValue.usd, total_fcfa: estimatedValue.fcfa }, priceScope)}</strong>
           </div>
         )}
       </div>
@@ -157,6 +162,7 @@ function StockPage() {
                   variant={variant}
                   stock={s}
                   low={!!low}
+                  priceScope={priceScope}
                   onSave={(qty: number, threshold: number) => {
                     if (!selectedPos) {
                       toast.error("Sélectionnez un point de vente");
@@ -180,12 +186,13 @@ function StockPage() {
   );
 }
 
-function StockRowEditor({ productName, variantLabel, variant, stock, low, onSave }: {
+function StockRowEditor({ productName, variantLabel, variant, stock, low, priceScope, onSave }: {
   productName: string;
   variantLabel: string;
   variant: VariantRow;
   stock?: StockRow;
   low: boolean;
+  priceScope?: string | null;
   onSave: (qty: number, threshold: number) => void;
 }) {
   const [qty, setQty] = useState(stock?.quantity ?? 0);
@@ -200,7 +207,11 @@ function StockRowEditor({ productName, variantLabel, variant, stock, low, onSave
       <td className="p-3 text-muted-foreground">{variantLabel}</td>
       <td className="p-3"><input type="number" value={qty} onChange={(e) => setQty(parseInt(e.target.value) || 0)} className="w-24 px-2 py-1 border border-border rounded bg-background" /></td>
       <td className="p-3"><input type="number" value={thr} onChange={(e) => setThr(parseInt(e.target.value) || 0)} className="w-24 px-2 py-1 border border-border rounded bg-background" /></td>
-      <td className="p-3 text-xs text-muted-foreground">${variant.price_usd} · {Number(variant.price_fcfa).toLocaleString("fr-FR")} FCFA</td>
+      <td className="p-3 text-xs text-muted-foreground">
+        {priceScope
+          ? formatScopedMoney({ total_usd: variant.price_usd, total_fcfa: variant.price_fcfa }, priceScope)
+          : `$${variant.price_usd} · ${Number(variant.price_fcfa).toLocaleString("fr-FR")} FCFA`}
+      </td>
       <td className="p-3">{low ? <span className="text-destructive text-xs">⚠ Stock bas</span> : <span className="text-xs text-muted-foreground">OK</span>}</td>
       <td className="p-3 text-right"><button onClick={() => onSave(qty, thr)} className="text-xs uppercase tracking-widest text-copper">Enregistrer</button></td>
     </tr>

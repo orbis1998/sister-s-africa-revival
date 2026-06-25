@@ -38,10 +38,10 @@ export async function assertWholesaleAccess(supabaseAdmin: any, userId: string, 
   if (roles.includes("admin")) return;
   const { data } = await supabaseAdmin
     .from("manager_permissions")
-    .select("can_view_accounting, can_record_wholesale")
+    .select("can_record_wholesale")
     .eq("user_id", userId)
     .maybeSingle();
-  if (!data?.can_view_accounting || !data?.can_record_wholesale) {
+  if (!data?.can_record_wholesale) {
     throw new Error("Forbidden: vente en gros non autorisée");
   }
 }

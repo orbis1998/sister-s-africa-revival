@@ -1,10 +1,10 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, Package, Boxes, Store, LogOut, Truck, Briefcase, ClipboardList, Star, Settings, ShoppingCart, HandCoins, BookOpen } from "lucide-react";
+import { LayoutDashboard, Users, Package, Boxes, Store, LogOut, Truck, Briefcase, ClipboardList, Star, Settings, ShoppingCart, HandCoins, BookOpen, Wallet } from "lucide-react";
 import { useAuth, type AppRole } from "@/lib/auth";
 import { useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getMyManagerPermissions, type ManagerPermissions } from "@/lib/permissions.functions";
+import { getMyManagerPermissions, normalizeManagerPermissions, type ManagerPermissions } from "@/lib/permissions.functions";
 import logo from "@/assets/logo.png";
 
 type PermissionKey =
@@ -19,20 +19,27 @@ type PermissionKey =
   | "can_manage_users";
 type NavLink = { to: string; label: string; icon: any; exact?: boolean; permissions?: PermissionKey[]; requireAll?: boolean };
 
+function effectiveManagerPerms(perms: ManagerPermissions | null | undefined) {
+  if (!perms) return null;
+  return { ...perms, ...normalizeManagerPermissions(perms) };
+}
+
 function managerLinkVisible(perms: ManagerPermissions | null | undefined, link: NavLink) {
+  const effective = effectiveManagerPerms(perms);
   if (!link.permissions?.length) return true;
-  if (!perms) return false;
+  if (!effective) return false;
   return link.requireAll
-    ? link.permissions.every((permission) => perms[permission] === true)
-    : link.permissions.some((permission) => perms[permission] === true);
+    ? link.permissions.every((permission) => effective[permission] === true)
+    : link.permissions.some((permission) => effective[permission] === true);
 }
 
 function managerHasPermission(perms: ManagerPermissions | null | undefined, required: PermissionKey[], requireAll = false) {
+  const effective = effectiveManagerPerms(perms);
   if (!required.length) return true;
-  if (!perms) return false;
+  if (!effective) return false;
   return requireAll
-    ? required.every((permission) => perms[permission] === true)
-    : required.some((permission) => perms[permission] === true);
+    ? required.every((permission) => effective[permission] === true)
+    : required.some((permission) => effective[permission] === true);
 }
 
 const adminLinks: NavLink[] = [
@@ -81,20 +88,30 @@ export function StaffShell({
   useEffect(() => {
     if (!loading && user && !allowedRoles.some((role) => roles.includes(role))) {
       navigate({ to: "/auth" });
+      return;
     }
-    if (!loading && user && roles.includes("manager") && !roles.includes("admin") && requiredPermissions.length && !managerPerms.isLoading && !hasRequiredPermission) {
+    if (
+      !loading &&
+      user &&
+      roles.includes("manager") &&
+      !roles.includes("admin") &&
+      requiredPermissions.length &&
+      managerPerms.isSuccess &&
+      !hasRequiredPermission
+    ) {
       navigate({ to: "/manager" });
     }
-  }, [loading, roles, user, allowedRoles, requiredPermissions, managerPerms.isLoading, hasRequiredPermission, navigate]);
+  }, [loading, roles, user, allowedRoles, requiredPermissions, managerPerms.isSuccess, hasRequiredPermission, navigate]);
 
   const links: NavLink[] = primaryRole === "admin" ? adminLinks
     : primaryRole === "manager" ? [
       { to: "/manager", label: "Manager", icon: Briefcase, exact: true },
+      { to: "/manager/accounting", label: "Comptabilité", icon: Wallet, permissions: ["can_view_accounting"], exact: true },
       { to: "/pos", label: "POS", icon: ShoppingCart, permissions: ["can_manage_pos"] },
       { to: "/admin/products", label: "Produits", icon: Package, permissions: ["can_manage_products"] },
       { to: "/admin/stock", label: "Stock", icon: Boxes, permissions: ["can_manage_stock"] },
       { to: "/admin/logistics", label: "Commandes", icon: ClipboardList, permissions: ["can_manage_orders", "can_manage_logistics"] },
-      { to: "/admin/wholesale", label: "Vente en gros", icon: HandCoins, permissions: ["can_view_accounting", "can_record_wholesale"], requireAll: true },
+      { to: "/admin/wholesale", label: "Vente en gros", icon: HandCoins, permissions: ["can_record_wholesale"] },
     ]
     : primaryRole === "pos" ? [{ to: "/pos", label: "POS", icon: ShoppingCart, exact: true }]
     : [{ to: "/livreur", label: "Livreur", icon: Truck, exact: true }];

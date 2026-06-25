@@ -29,7 +29,9 @@ import { Route as AuthenticatedManagerRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedLivreurRouteImport } from './routes/_authenticated/livreur'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
+import { Route as AuthenticatedManagerIndexRouteImport } from './routes/_authenticated/manager.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedManagerAccountingRouteImport } from './routes/_authenticated/manager.accounting'
 import { Route as AuthenticatedAdminWholesaleRouteImport } from './routes/_authenticated/admin.wholesale'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminStockRouteImport } from './routes/_authenticated/admin.stock'
@@ -139,11 +141,23 @@ const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
   path: '/account',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedManagerIndexRoute =
+  AuthenticatedManagerIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedManagerRoute,
+  } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedManagerAccountingRoute =
+  AuthenticatedManagerAccountingRouteImport.update({
+    id: '/accounting',
+    path: '/accounting',
+    getParentRoute: () => AuthenticatedManagerRoute,
+  } as any)
 const AuthenticatedAdminWholesaleRoute =
   AuthenticatedAdminWholesaleRouteImport.update({
     id: '/wholesale',
@@ -209,7 +223,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AuthenticatedAccountRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/livreur': typeof AuthenticatedLivreurRoute
-  '/manager': typeof AuthenticatedManagerRoute
+  '/manager': typeof AuthenticatedManagerRouteWithChildren
   '/pos': typeof AuthenticatedPosRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/login/$role': typeof LoginRoleRoute
@@ -224,7 +238,9 @@ export interface FileRoutesByFullPath {
   '/admin/stock': typeof AuthenticatedAdminStockRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/wholesale': typeof AuthenticatedAdminWholesaleRoute
+  '/manager/accounting': typeof AuthenticatedManagerAccountingRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/manager/': typeof AuthenticatedManagerIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -238,7 +254,6 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/account': typeof AuthenticatedAccountRoute
   '/livreur': typeof AuthenticatedLivreurRoute
-  '/manager': typeof AuthenticatedManagerRoute
   '/pos': typeof AuthenticatedPosRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/login/$role': typeof LoginRoleRoute
@@ -253,7 +268,9 @@ export interface FileRoutesByTo {
   '/admin/stock': typeof AuthenticatedAdminStockRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/wholesale': typeof AuthenticatedAdminWholesaleRoute
+  '/manager/accounting': typeof AuthenticatedManagerAccountingRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/manager': typeof AuthenticatedManagerIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -271,7 +288,7 @@ export interface FileRoutesById {
   '/_authenticated/account': typeof AuthenticatedAccountRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/livreur': typeof AuthenticatedLivreurRoute
-  '/_authenticated/manager': typeof AuthenticatedManagerRoute
+  '/_authenticated/manager': typeof AuthenticatedManagerRouteWithChildren
   '/_authenticated/pos': typeof AuthenticatedPosRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/login/$role': typeof LoginRoleRoute
@@ -286,7 +303,9 @@ export interface FileRoutesById {
   '/_authenticated/admin/stock': typeof AuthenticatedAdminStockRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/wholesale': typeof AuthenticatedAdminWholesaleRoute
+  '/_authenticated/manager/accounting': typeof AuthenticatedManagerAccountingRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/manager/': typeof AuthenticatedManagerIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -319,7 +338,9 @@ export interface FileRouteTypes {
     | '/admin/stock'
     | '/admin/users'
     | '/admin/wholesale'
+    | '/manager/accounting'
     | '/admin/'
+    | '/manager/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -333,7 +354,6 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/account'
     | '/livreur'
-    | '/manager'
     | '/pos'
     | '/blog/$slug'
     | '/login/$role'
@@ -348,7 +368,9 @@ export interface FileRouteTypes {
     | '/admin/stock'
     | '/admin/users'
     | '/admin/wholesale'
+    | '/manager/accounting'
     | '/admin'
+    | '/manager'
   id:
     | '__root__'
     | '/'
@@ -380,7 +402,9 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/stock'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/wholesale'
+    | '/_authenticated/manager/accounting'
     | '/_authenticated/admin/'
+    | '/_authenticated/manager/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -540,12 +564,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccountRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/manager/': {
+      id: '/_authenticated/manager/'
+      path: '/'
+      fullPath: '/manager/'
+      preLoaderRoute: typeof AuthenticatedManagerIndexRouteImport
+      parentRoute: typeof AuthenticatedManagerRoute
+    }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/manager/accounting': {
+      id: '/_authenticated/manager/accounting'
+      path: '/accounting'
+      fullPath: '/manager/accounting'
+      preLoaderRoute: typeof AuthenticatedManagerAccountingRouteImport
+      parentRoute: typeof AuthenticatedManagerRoute
     }
     '/_authenticated/admin/wholesale': {
       id: '/_authenticated/admin/wholesale'
@@ -642,11 +680,24 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
 const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
+interface AuthenticatedManagerRouteChildren {
+  AuthenticatedManagerAccountingRoute: typeof AuthenticatedManagerAccountingRoute
+  AuthenticatedManagerIndexRoute: typeof AuthenticatedManagerIndexRoute
+}
+
+const AuthenticatedManagerRouteChildren: AuthenticatedManagerRouteChildren = {
+  AuthenticatedManagerAccountingRoute: AuthenticatedManagerAccountingRoute,
+  AuthenticatedManagerIndexRoute: AuthenticatedManagerIndexRoute,
+}
+
+const AuthenticatedManagerRouteWithChildren =
+  AuthenticatedManagerRoute._addFileChildren(AuthenticatedManagerRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountRoute: typeof AuthenticatedAccountRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedLivreurRoute: typeof AuthenticatedLivreurRoute
-  AuthenticatedManagerRoute: typeof AuthenticatedManagerRoute
+  AuthenticatedManagerRoute: typeof AuthenticatedManagerRouteWithChildren
   AuthenticatedPosRoute: typeof AuthenticatedPosRoute
 }
 
@@ -654,7 +705,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccountRoute: AuthenticatedAccountRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedLivreurRoute: AuthenticatedLivreurRoute,
-  AuthenticatedManagerRoute: AuthenticatedManagerRoute,
+  AuthenticatedManagerRoute: AuthenticatedManagerRouteWithChildren,
   AuthenticatedPosRoute: AuthenticatedPosRoute,
 }
 

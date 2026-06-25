@@ -1,18 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useAuth } from "@/lib/auth";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { listWholesaleSales } from "@/lib/finance.functions";
 import { ADMIN_REPORT_REGIONS, directionLabel, formatRegionMoney, formatScopedMoney } from "@/lib/staff-scope";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin/wholesale")({
   component: WholesaleAdminPage,
 });
 
 function WholesaleAdminPage() {
+  const { user, roles } = useAuth();
+  const isAdmin = roles.includes("admin");
   const listWholesale = useServerFn(listWholesaleSales);
+  const { data: profile } = useQuery({
+    queryKey: ["wholesale-profile", user?.id],
+    enabled: !!user && !isAdmin,
+    queryFn: async () => (await supabase.from("profiles").select("city_scope").eq("id", user!.id).maybeSingle()).data,
+  });
   const { data: sales = [], isLoading } = useQuery({
-    queryKey: ["admin-wholesale-sales"],
+    queryKey: ["wholesale-sales", user?.id, isAdmin ? "admin" : profile?.city_scope],
     queryFn: () => listWholesale({}),
   });
 
@@ -21,7 +30,11 @@ function WholesaleAdminPage() {
     fcfa: sum.fcfa + Number(sale.total_fcfa ?? 0),
   }), { usd: 0, fcfa: 0 });
 
-  const byRegion = ADMIN_REPORT_REGIONS.map((region) => {
+  const visibleRegions = isAdmin
+    ? ADMIN_REPORT_REGIONS
+    : ADMIN_REPORT_REGIONS.filter((region) => region.scopes.includes(profile?.city_scope as any));
+
+  const byRegion = visibleRegions.map((region) => {
     const rows = sales.filter((sale: any) => region.scopes.includes(sale.city_scope));
     return {
       region,
@@ -32,55 +45,65 @@ function WholesaleAdminPage() {
   });
 
   return (
-    <StaffShell title="Administration" requiredRole={["admin", "manager"]} requiredPermission={["can_view_accounting", "can_record_wholesale"]} requireAllPermissions>
+    <StaffShell title={isAdmin ? "Administration" : "Manager"} requiredRole={["admin", "manager"]} requiredPermission="can_record_wholesale">
       <span className="eyebrow">Commercial</span>
       <h1 className="font-display text-4xl mt-2">Ventes en gros</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Suivi des ventes en gros enregistrées par les managers, avec prix fixé manuellement.
+        {isAdmin
+          ? "Suivi des ventes en gros enregistrées par les managers, avec prix fixé manuellement."
+          : `Ventes en gros de votre direction : ${directionLabel(profile?.city_scope)}.`}
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <Stat label="Total USD (RDC + export)" value={`$${totals.usd.toFixed(2)}`} />
-        <Stat label="Total FCFA (Congo)" value={`${totals.fcfa.toLocaleString("fr-FR")} FCFA`} />
+        {isAdmin ? (
+          <>
+            <Stat label="Total USD (RDC + export)" value={`$${totals.usd.toFixed(2)}`} />
+            <Stat label="Total FCFA (Congo)" value={`${totals.fcfa.toLocaleString("fr-FR")} FCFA`} />
+          </>
+        ) : (
+          <Stat label={`Total ${directionLabel(profile?.city_scope)}`} value={formatScopedMoney({ total_usd: totals.usd, total_fcfa: totals.fcfa }, profile?.city_scope)} />
+        )}
         <Stat label="Nombre de ventes" value={sales.length} />
       </div>
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-3">
-        {byRegion.map((row) => (
-          <div key={row.region.key} className="rounded-2xl border border-border bg-card p-5">
-            <h2 className="font-display text-xl">{row.region.label}</h2>
-            <div className="mt-3 text-sm text-muted-foreground">{row.count} vente(s)</div>
-            <div className="mt-2 font-medium text-copper text-sm">
-              {formatRegionMoney({ usd: row.usd, fcfa: row.fcfa }, row.region)}
+      {byRegion.length > 0 && (
+        <div className="mt-8 grid gap-4 lg:grid-cols-3">
+          {byRegion.map((row) => (
+            <div key={row.region.key} className="rounded-2xl border border-border bg-card p-5">
+              <h2 className="font-display text-xl">{row.region.label}</h2>
+              <div className="mt-3 text-sm text-muted-foreground">{row.count} vente(s)</div>
+              <div className="mt-2 font-medium text-copper text-sm">
+                {formatRegionMoney({ usd: row.usd, fcfa: row.fcfa }, row.region)}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <div className="mt-8 overflow-hidden rounded-2xl border border-border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-clay/50 text-left text-xs uppercase tracking-widest">
             <tr>
               <th className="p-3">Date</th>
-              <th className="p-3">Direction</th>
+              {isAdmin && <th className="p-3">Direction</th>}
               <th className="p-3">Client</th>
               <th className="p-3">Produit</th>
               <th className="p-3">Qté</th>
               <th className="p-3">Prix unitaire</th>
               <th className="p-3">Total</th>
               <th className="p-3">Statut</th>
-              <th className="p-3">Manager</th>
+              {isAdmin && <th className="p-3">Manager</th>}
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Chargement...</td></tr>
+              <tr><td colSpan={isAdmin ? 9 : 7} className="p-6 text-center text-muted-foreground">Chargement...</td></tr>
             ) : sales.length === 0 ? (
-              <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Aucune vente en gros.</td></tr>
+              <tr><td colSpan={isAdmin ? 9 : 7} className="p-6 text-center text-muted-foreground">Aucune vente en gros.</td></tr>
             ) : sales.map((sale: any) => (
               <tr key={sale.id} className="border-t border-border">
                 <td className="p-3">{new Date(sale.sold_at).toLocaleDateString("fr-FR")}</td>
-                <td className="p-3">{directionLabel(sale.city_scope)}</td>
+                {isAdmin && <td className="p-3">{directionLabel(sale.city_scope)}</td>}
                 <td className="p-3">
                   <div>{sale.customer_name}</div>
                   {sale.customer_phone && <div className="text-xs text-muted-foreground">{sale.customer_phone}</div>}
@@ -90,7 +113,7 @@ function WholesaleAdminPage() {
                 <td className="p-3">{formatScopedMoney({ total_usd: sale.unit_price_usd, total_fcfa: sale.unit_price_fcfa }, sale.city_scope)}</td>
                 <td className="p-3 font-medium text-copper">{formatScopedMoney({ total_usd: sale.total_usd, total_fcfa: sale.total_fcfa }, sale.city_scope)}</td>
                 <td className="p-3">{statusLabel(sale.payment_status)}</td>
-                <td className="p-3 text-xs text-muted-foreground">{sale.profiles?.full_name ?? sale.profiles?.badge_id ?? "—"}</td>
+                {isAdmin && <td className="p-3 text-xs text-muted-foreground">{sale.profiles?.full_name ?? sale.profiles?.badge_id ?? "—"}</td>}
               </tr>
             ))}
           </tbody>

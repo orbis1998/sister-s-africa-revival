@@ -49,7 +49,8 @@ export const getMyManagerPermissions = createServerFn({ method: "GET" })
       .eq("user_id", ctx.userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return (data as ManagerPermissions | null) ?? null;
+    if (!data) return null;
+    return { ...(data as ManagerPermissions), ...normalizeManagerPermissions(data as ManagerPermissions) };
   });
 
 async function assertAdmin(ctx: { supabase: any; userId: string }) {

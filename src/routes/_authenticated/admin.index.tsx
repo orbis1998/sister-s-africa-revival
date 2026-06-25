@@ -8,7 +8,7 @@ import { StaffShell } from "@/components/admin/AdminLayout";
 import { exportCompanyReport, exportCompanyReportPdf } from "@/lib/accounting.functions";
 import { listStaffExpenses, listWholesaleSales } from "@/lib/finance.functions";
 import { ADMIN_REPORT_REGIONS, directionFromCity, formatOrderAmount, formatRegionMoney } from "@/lib/staff-scope";
-import { AlertTriangle, ClipboardList, DollarSign, Download, FileText, MessageSquare, Package, ShoppingCart, Store, TrendingUp } from "lucide-react";
+import { AlertTriangle, ClipboardList, DollarSign, Download, FileText, HandCoins, MessageSquare, Package, ShoppingCart, Store, TrendingUp } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   component: AdminDashboard,
@@ -108,6 +108,9 @@ function AdminDashboard() {
   const deliveredOrders = ordersWithScope.filter((o: any) => o.status === "delivered");
   const revenueRows = [...deliveredOrders, ...salesWithScope, ...wholesaleSales];
   const revenue = sumMoney(revenueRows);
+  const deliveredRevenue = sumMoney(deliveredOrders);
+  const posRevenue = sumMoney(salesWithScope);
+  const wholesaleRevenue = sumMoney(wholesaleSales);
   const today = new Date();
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(today.getDate() - 7);
@@ -118,10 +121,19 @@ function AdminDashboard() {
   const pendingReviews = (reviews ?? []).filter((r: any) => !r.approved).length;
   const pendingOrders = (orders ?? []).filter((o: any) => !["delivered", "cancelled"].includes(o.status)).length;
   const byRegion = ADMIN_REPORT_REGIONS.map((region) => {
-    const scopedRevenue = sumMoney(revenueRows.filter((row: any) => region.scopes.includes(row.city_scope)));
+    const scopedDelivered = sumMoney(deliveredOrders.filter((row: any) => region.scopes.includes(row.city_scope)));
+    const scopedPos = sumMoney(salesWithScope.filter((row: any) => region.scopes.includes(row.city_scope)));
+    const scopedWholesale = sumMoney(wholesaleSales.filter((row: any) => region.scopes.includes(row.city_scope)));
+    const scopedRevenue = {
+      usd: scopedDelivered.usd + scopedPos.usd + scopedWholesale.usd,
+      fcfa: scopedDelivered.fcfa + scopedPos.fcfa + scopedWholesale.fcfa,
+    };
     const scopedExpenses = sumMoney(expenses.filter((row: any) => region.scopes.includes(row.city_scope)));
     return {
       region,
+      delivered: scopedDelivered,
+      pos: scopedPos,
+      wholesale: scopedWholesale,
       revenue: scopedRevenue,
       expenses: scopedExpenses,
       net: {
@@ -195,6 +207,9 @@ function AdminDashboard() {
         <Stat icon={DollarSign} label="Recette il y a 7 jours" value={`$${sevenDaysAgoRevenue.usd.toFixed(2)}`} sub={`${sevenDaysAgoRevenue.fcfa.toLocaleString("fr-FR")} FCFA`} />
         <Stat icon={DollarSign} label="Dépenses aujourd'hui" value={`$${todayExpenses.usd.toFixed(2)}`} sub={`${todayExpenses.fcfa.toLocaleString("fr-FR")} FCFA`} />
         <Stat icon={TrendingUp} label="Net global" value={`$${(revenue.usd - expenseTotal.usd).toFixed(2)}`} sub={`${(revenue.fcfa - expenseTotal.fcfa).toLocaleString("fr-FR")} FCFA`} dark />
+        <Stat icon={ClipboardList} label="CA commandes livrées" value={`$${deliveredRevenue.usd.toFixed(2)}`} sub={`${deliveredRevenue.fcfa.toLocaleString("fr-FR")} FCFA`} />
+        <Stat icon={ShoppingCart} label="CA ventes POS" value={`$${posRevenue.usd.toFixed(2)}`} sub={`${posRevenue.fcfa.toLocaleString("fr-FR")} FCFA`} />
+        <Stat icon={HandCoins} label="CA ventes en gros" value={`$${wholesaleRevenue.usd.toFixed(2)}`} sub={`${wholesaleRevenue.fcfa.toLocaleString("fr-FR")} FCFA`} />
         <Stat icon={Package} label="Valeur stock POS" value={`$${posStockValue.usd.toFixed(2)}`} sub={`${posStockValue.fcfa.toLocaleString("fr-FR")} FCFA`} />
         <Stat icon={Package} label="Produits" value={products?.length ?? 0} />
         <Stat icon={Store} label="Points de vente" value={pos?.length ?? 0} />
@@ -220,10 +235,13 @@ function AdminDashboard() {
             <div key={row.region.key} className="rounded-2xl border border-border bg-cream/70 p-5">
               <h3 className="font-display text-xl">{row.region.label}</h3>
               <div className="mt-4 space-y-3 text-sm">
-                <Line label="Recettes" value={formatRegionMoney(row.revenue, row.region)} />
+                <Line label="Commandes livrées" value={formatRegionMoney(row.delivered, row.region)} />
+                <Line label="Ventes POS" value={formatRegionMoney(row.pos, row.region)} />
+                <Line label="Ventes en gros" value={formatRegionMoney(row.wholesale, row.region)} />
+                <Line label="Recettes totales" value={formatRegionMoney(row.revenue, row.region)} />
                 <Line label="Dépenses" value={formatRegionMoney(row.expenses, row.region)} />
-                <Line label="Net" value={formatRegionMoney(row.net, row.region)} strong />
-                <Line label="Commandes livrées" value={row.orders} />
+                <Line label="CA net" value={formatRegionMoney(row.net, row.region)} strong />
+                <Line label="Nb commandes livrées" value={row.orders} />
               </div>
             </div>
           ))}

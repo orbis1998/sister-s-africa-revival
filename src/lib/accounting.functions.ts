@@ -1,18 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ADMIN_REPORT_REGIONS, directionFromCity, directionLabel } from "@/lib/staff-scope";
+import { normalizeManagerPermissions } from "@/lib/permissions.functions";
+import { resolveManagerCityScope } from "@/lib/manager-finance-scope";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
-async function assertAdminOrAccounting(ctx: { supabase: any; userId: string }) {
+async function assertExportAccess(ctx: { supabase: any; userId: string }) {
   const { data: isAdmin } = await ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" });
-  if (isAdmin) return;
-  const { data: perms } = await ctx.supabase
-    .from("manager_permissions")
-    .select("can_view_accounting")
-    .eq("user_id", ctx.userId)
-    .maybeSingle();
-  if (!perms?.can_view_accounting) throw new Error("Forbidden");
+  if (isAdmin) return { isAdmin: true as const, cityScope: null as string | null };
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const [{ data: perms }, cityScope] = await Promise.all([
+    supabaseAdmin.from("manager_permissions").select("*").eq("user_id", ctx.userId).maybeSingle(),
+    resolveManagerCityScope(supabaseAdmin, ctx.userId),
+  ]);
+  const effective = normalizeManagerPermissions(perms ?? undefined);
+  if (!effective.can_view_accounting) throw new Error("Forbidden");
+  if (!cityScope) throw new Error("Direction manquante — contactez l'administrateur");
+  return { isAdmin: false as const, cityScope };
 }
 
 function csvEscape(value: unknown) {
@@ -28,18 +34,40 @@ function sumMoney(rows: any[], usdKey: string, fcfaKey: string) {
   );
 }
 
-async function buildCompanyReport(fromInput?: string, toInput?: string) {
+async function buildCompanyReport(fromInput?: string, toInput?: string, cityScope?: string | null) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const from = fromInput ? new Date(fromInput) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const to = toInput ? new Date(toInput) : new Date();
   to.setHours(23, 59, 59, 999);
 
-  const [{ data: orders }, { data: posSales }, { data: wholesale }, { data: expenses }, { data: posList }] = await Promise.all([
-    supabaseAdmin.from("orders").select("*").gte("created_at", from.toISOString()).lte("created_at", to.toISOString()),
-    supabaseAdmin.from("pos_sales").select("*").gte("created_at", from.toISOString()).lte("created_at", to.toISOString()),
-    supabaseAdmin.from("wholesale_sales").select("*").gte("sold_at", from.toISOString()).lte("sold_at", to.toISOString()),
-    supabaseAdmin.from("staff_expenses").select("*").gte("spent_at", from.toISOString()).lte("spent_at", to.toISOString()),
-    supabaseAdmin.from("points_of_sale").select("id, name, city"),
+  const { data: posList } = await supabaseAdmin.from("points_of_sale").select("id, name, city");
+  const scopedPosIds = cityScope
+    ? (posList ?? []).filter((p: any) => directionFromCity(p.city) === cityScope).map((p: any) => p.id)
+    : null;
+
+  let ordersQuery = supabaseAdmin.from("orders").select("*")
+    .gte("created_at", from.toISOString()).lte("created_at", to.toISOString());
+  let posSalesQuery = supabaseAdmin.from("pos_sales").select("*")
+    .gte("created_at", from.toISOString()).lte("created_at", to.toISOString());
+  let wholesaleQuery = supabaseAdmin.from("wholesale_sales").select("*")
+    .gte("sold_at", from.toISOString()).lte("sold_at", to.toISOString());
+  let expensesQuery = supabaseAdmin.from("staff_expenses").select("*")
+    .gte("spent_at", from.toISOString()).lte("spent_at", to.toISOString());
+
+  if (cityScope) {
+    ordersQuery = ordersQuery.eq("city_scope", cityScope);
+    wholesaleQuery = wholesaleQuery.eq("city_scope", cityScope);
+    expensesQuery = expensesQuery.eq("city_scope", cityScope);
+    posSalesQuery = scopedPosIds?.length
+      ? posSalesQuery.in("pos_id", scopedPosIds)
+      : posSalesQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+  }
+
+  const [{ data: orders }, { data: posSales }, { data: wholesale }, { data: expenses }] = await Promise.all([
+    ordersQuery,
+    posSalesQuery,
+    wholesaleQuery,
+    expensesQuery,
   ]);
 
   const posScope = Object.fromEntries((posList ?? []).map((p: any) => [p.id, p.city]));
@@ -53,28 +81,56 @@ async function buildCompanyReport(fromInput?: string, toInput?: string) {
   const totalRevenue = sumMoney(revenueRows, "total_usd", "total_fcfa");
   const totalExpenses = sumMoney(expenses ?? [], "amount_usd", "amount_fcfa");
 
-  const regionStats = ADMIN_REPORT_REGIONS.map((region) => {
-    const scopedRevenue = sumMoney(
-      revenueRows.filter((row: any) => region.scopes.includes(row.city_scope)),
-      "total_usd",
-      "total_fcfa",
-    );
-    const scopedExpenses = sumMoney(
-      (expenses ?? []).filter((row: any) => region.scopes.includes(row.city_scope)),
-      "amount_usd",
-      "amount_fcfa",
-    );
-    return {
-      region,
-      revenue: scopedRevenue,
-      expenses: scopedExpenses,
-      net: {
-        usd: scopedRevenue.usd - scopedExpenses.usd,
-        fcfa: scopedRevenue.fcfa - scopedExpenses.fcfa,
-      },
-      orders: deliveredOrders.filter((row: any) => region.scopes.includes(row.city_scope)).length,
-    };
-  });
+  const regionStats = cityScope
+    ? [{
+        region: { key: cityScope, label: directionLabel(cityScope), scopes: [cityScope] as any },
+        revenue: totalRevenue,
+        expenses: totalExpenses,
+        net: { usd: totalRevenue.usd - totalExpenses.usd, fcfa: totalRevenue.fcfa - totalExpenses.fcfa },
+        orders: deliveredOrders.length,
+        delivered: sumMoney(deliveredOrders, "total_usd", "total_fcfa"),
+        pos: sumMoney(posSalesScoped, "total_usd", "total_fcfa"),
+        wholesale: sumMoney(wholesale ?? [], "total_usd", "total_fcfa"),
+      }]
+    : ADMIN_REPORT_REGIONS.map((region) => {
+        const scopedDelivered = sumMoney(
+          deliveredOrders.filter((row: any) => region.scopes.includes(row.city_scope)),
+          "total_usd",
+          "total_fcfa",
+        );
+        const scopedPos = sumMoney(
+          posSalesScoped.filter((row: any) => region.scopes.includes(row.city_scope)),
+          "total_usd",
+          "total_fcfa",
+        );
+        const scopedWholesale = sumMoney(
+          (wholesale ?? []).filter((row: any) => region.scopes.includes(row.city_scope)),
+          "total_usd",
+          "total_fcfa",
+        );
+        const scopedRevenue = {
+          usd: scopedDelivered.usd + scopedPos.usd + scopedWholesale.usd,
+          fcfa: scopedDelivered.fcfa + scopedPos.fcfa + scopedWholesale.fcfa,
+        };
+        const scopedExpenses = sumMoney(
+          (expenses ?? []).filter((row: any) => region.scopes.includes(row.city_scope)),
+          "amount_usd",
+          "amount_fcfa",
+        );
+        return {
+          region,
+          delivered: scopedDelivered,
+          pos: scopedPos,
+          wholesale: scopedWholesale,
+          revenue: scopedRevenue,
+          expenses: scopedExpenses,
+          net: {
+            usd: scopedRevenue.usd - scopedExpenses.usd,
+            fcfa: scopedRevenue.fcfa - scopedExpenses.fcfa,
+          },
+          orders: deliveredOrders.filter((row: any) => region.scopes.includes(row.city_scope)).length,
+        };
+      });
 
   const transactions: Array<{
     type: string;
@@ -137,13 +193,16 @@ async function buildCompanyReport(fromInput?: string, toInput?: string) {
   }
 
   const periodLabel = `${from.toLocaleDateString("fr-FR")} — ${to.toLocaleDateString("fr-FR")}`;
-  const filenameBase = `the-sisters-africa-rapport-${from.toISOString().slice(0, 10)}_${to.toISOString().slice(0, 10)}`;
+  const scopeSuffix = cityScope ? `-${cityScope}` : "";
+  const filenameBase = `the-sisters-africa-rapport${scopeSuffix}-${from.toISOString().slice(0, 10)}_${to.toISOString().slice(0, 10)}`;
 
   return {
     from,
     to,
     periodLabel,
     filenameBase,
+    cityScope: cityScope ?? null,
+    cityLabel: cityScope ? directionLabel(cityScope) : null,
     deliveredOrders,
     posSales,
     wholesale,
@@ -161,6 +220,7 @@ async function buildCompanyReport(fromInput?: string, toInput?: string) {
 function buildCsv(report: Awaited<ReturnType<typeof buildCompanyReport>>) {
   const lines: string[] = [];
   lines.push("Rapport The Sisters Africa");
+  if (report.cityLabel) lines.push(`Direction;${report.cityLabel}`);
   lines.push(`Période;${report.from.toLocaleDateString("fr-FR")};${report.to.toLocaleDateString("fr-FR")}`);
   lines.push("");
   lines.push("Section;Indicateur;USD;FCFA");
@@ -173,6 +233,15 @@ function buildCsv(report: Awaited<ReturnType<typeof buildCompanyReport>>) {
   lines.push("");
 
   for (const row of report.regionStats) {
+    const delivered = (row as any).delivered ?? row.revenue;
+    const pos = (row as any).pos ?? { usd: 0, fcfa: 0 };
+    const wholesale = (row as any).wholesale ?? { usd: 0, fcfa: 0 };
+    lines.push(`Région;${row.region.label};Commandes livrées USD;${delivered.usd.toFixed(2)}`);
+    lines.push(`Région;${row.region.label};Commandes livrées FCFA;${delivered.fcfa}`);
+    lines.push(`Région;${row.region.label};POS USD;${pos.usd.toFixed(2)}`);
+    lines.push(`Région;${row.region.label};POS FCFA;${pos.fcfa}`);
+    lines.push(`Région;${row.region.label};Gros USD;${wholesale.usd.toFixed(2)}`);
+    lines.push(`Région;${row.region.label};Gros FCFA;${wholesale.fcfa}`);
     lines.push(`Région;${row.region.label};Recettes USD;${row.revenue.usd.toFixed(2)}`);
     lines.push(`Région;${row.region.label};Recettes FCFA;${row.revenue.fcfa}`);
     lines.push(`Région;${row.region.label};Dépenses USD;${row.expenses.usd.toFixed(2)}`);
@@ -209,7 +278,7 @@ function buildPdfBase64(report: Awaited<ReturnType<typeof buildCompanyReport>>) 
   doc.setFontSize(20);
   doc.text("The Sisters Africa", 14, 16);
   doc.setFontSize(11);
-  doc.text("Rapport comptable entreprise", 14, 24);
+  doc.text(report.cityLabel ? `Rapport comptable — ${report.cityLabel}` : "Rapport comptable entreprise", 14, 24);
   doc.setFontSize(9);
   doc.text(`Période : ${report.periodLabel}`, 14, 30);
 
@@ -291,8 +360,8 @@ export const exportCompanyReport = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { from?: string; to?: string }) => d ?? {})
   .handler(async ({ data, context }) => {
-    await assertAdminOrAccounting(context as any);
-    const report = await buildCompanyReport(data.from, data.to);
+    const access = await assertExportAccess(context as any);
+    const report = await buildCompanyReport(data.from, data.to, access.cityScope);
     return {
       filename: `${report.filenameBase}.csv`,
       csv: buildCsv(report),
@@ -308,8 +377,8 @@ export const exportCompanyReportPdf = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { from?: string; to?: string }) => d ?? {})
   .handler(async ({ data, context }) => {
-    await assertAdminOrAccounting(context as any);
-    const report = await buildCompanyReport(data.from, data.to);
+    const access = await assertExportAccess(context as any);
+    const report = await buildCompanyReport(data.from, data.to, access.cityScope);
     return {
       filename: `${report.filenameBase}.pdf`,
       pdfBase64: buildPdfBase64(report),
