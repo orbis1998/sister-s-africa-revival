@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, MapPin, Phone } from "lucide-react";
-import { fetchPublishedBlogPosts, type BlogPostPublic } from "@/lib/blog";
+import { fetchPublishedBlogPosts, blogPostPathKey, type BlogPostPublic } from "@/lib/blog";
 import { fetchPublicPointsOfSale } from "@/lib/public-pos";
 import { buildSeoMeta } from "@/lib/seo";
 import { defaultSiteSettings, fetchSiteSettings } from "@/lib/site-settings";
@@ -24,10 +24,11 @@ export const Route = createFileRoute("/blog")({
 });
 
 function BlogArticleCard({ article, index }: { article: BlogPostPublic; index: number }) {
+  const articleKey = blogPostPathKey(article);
   return (
     <Link
       to="/article/$slug"
-      params={{ slug: article.slug }}
+      params={{ slug: articleKey }}
       className="group block overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-elegant"
     >
       <div className="grid min-h-full sm:grid-cols-[0.38fr_0.62fr]">

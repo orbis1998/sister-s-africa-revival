@@ -77,7 +77,13 @@ export const adminUpsertBlogPost = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context as any);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const payload = { ...data, updated_by: (context as any).userId };
+    const { slugifyBlogTitle } = await import("@/lib/blog");
+    const payload = {
+      ...data,
+      slug: slugifyBlogTitle(data.slug?.trim() || data.title || "article"),
+      updated_by: (context as any).userId,
+    };
+    if (!payload.title?.trim()) throw new Error("Le titre est obligatoire");
     const { error } = await supabaseAdmin.from("blog_posts").upsert(payload, { onConflict: "slug" });
     if (error) throw new Error(error.message);
     return { ok: true };

@@ -17,6 +17,21 @@ export type BlogPostPublic = {
 
 const select = "id, slug, title, excerpt, content_html, cover_image_url, category, read_time, sort_order, seo_title, seo_description, created_at";
 
+export function slugifyBlogTitle(title: string) {
+  return title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "article";
+}
+
+export function blogPostPathKey(post: { slug: string; id: string }) {
+  const slug = post.slug?.trim();
+  return slug || post.id;
+}
+
 export async function fetchPublishedBlogPosts() {
   const { data, error } = await supabase
     .from("blog_posts")
@@ -27,13 +42,25 @@ export async function fetchPublishedBlogPosts() {
   return (data ?? []) as BlogPostPublic[];
 }
 
-export async function fetchBlogPostBySlugPublic(slug: string) {
-  const { data, error } = await supabase
+export async function fetchBlogPostBySlugPublic(slugOrId: string) {
+  const key = slugOrId?.trim();
+  if (!key) return null;
+
+  const { data: bySlug, error: slugError } = await supabase
     .from("blog_posts")
     .select(select)
-    .eq("slug", slug)
+    .eq("slug", key)
     .eq("is_published", true)
     .maybeSingle();
-  if (error) throw new Error(error.message);
-  return data as BlogPostPublic | null;
+  if (slugError) throw new Error(slugError.message);
+  if (bySlug) return bySlug as BlogPostPublic;
+
+  const { data: byId, error: idError } = await supabase
+    .from("blog_posts")
+    .select(select)
+    .eq("id", key)
+    .eq("is_published", true)
+    .maybeSingle();
+  if (idError) throw new Error(idError.message);
+  return byId as BlogPostPublic | null;
 }

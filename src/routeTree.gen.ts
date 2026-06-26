@@ -22,7 +22,6 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as LoginRoleRouteImport } from './routes/login.$role'
-import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as ArticleSlugRouteImport } from './routes/article.$slug'
 import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
 import { Route as AuthenticatedManagerRouteImport } from './routes/_authenticated/manager'
@@ -105,11 +104,6 @@ const LoginRoleRoute = LoginRoleRouteImport.update({
   id: '/$role',
   path: '/$role',
   getParentRoute: () => LoginRoute,
-} as any)
-const BlogSlugRoute = BlogSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => BlogRoute,
 } as any)
 const ArticleSlugRoute = ArticleSlugRouteImport.update({
   id: '/article/$slug',
@@ -212,7 +206,7 @@ const AuthenticatedAdminBlogRoute = AuthenticatedAdminBlogRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/blog': typeof BlogRouteWithChildren
+  '/blog': typeof BlogRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
@@ -226,7 +220,6 @@ export interface FileRoutesByFullPath {
   '/manager': typeof AuthenticatedManagerRouteWithChildren
   '/pos': typeof AuthenticatedPosRoute
   '/article/$slug': typeof ArticleSlugRoute
-  '/blog/$slug': typeof BlogSlugRoute
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
   '/admin/blog': typeof AuthenticatedAdminBlogRoute
@@ -245,7 +238,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/blog': typeof BlogRouteWithChildren
+  '/blog': typeof BlogRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
@@ -257,7 +250,6 @@ export interface FileRoutesByTo {
   '/livreur': typeof AuthenticatedLivreurRoute
   '/pos': typeof AuthenticatedPosRoute
   '/article/$slug': typeof ArticleSlugRoute
-  '/blog/$slug': typeof BlogSlugRoute
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
   '/admin/blog': typeof AuthenticatedAdminBlogRoute
@@ -278,7 +270,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
-  '/blog': typeof BlogRouteWithChildren
+  '/blog': typeof BlogRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
@@ -292,7 +284,6 @@ export interface FileRoutesById {
   '/_authenticated/manager': typeof AuthenticatedManagerRouteWithChildren
   '/_authenticated/pos': typeof AuthenticatedPosRoute
   '/article/$slug': typeof ArticleSlugRoute
-  '/blog/$slug': typeof BlogSlugRoute
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
   '/_authenticated/admin/blog': typeof AuthenticatedAdminBlogRoute
@@ -327,7 +318,6 @@ export interface FileRouteTypes {
     | '/manager'
     | '/pos'
     | '/article/$slug'
-    | '/blog/$slug'
     | '/login/$role'
     | '/product/$slug'
     | '/admin/blog'
@@ -358,7 +348,6 @@ export interface FileRouteTypes {
     | '/livreur'
     | '/pos'
     | '/article/$slug'
-    | '/blog/$slug'
     | '/login/$role'
     | '/product/$slug'
     | '/admin/blog'
@@ -392,7 +381,6 @@ export interface FileRouteTypes {
     | '/_authenticated/manager'
     | '/_authenticated/pos'
     | '/article/$slug'
-    | '/blog/$slug'
     | '/login/$role'
     | '/product/$slug'
     | '/_authenticated/admin/blog'
@@ -413,7 +401,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
-  BlogRoute: typeof BlogRouteWithChildren
+  BlogRoute: typeof BlogRoute
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
   ContactRoute: typeof ContactRoute
@@ -517,13 +505,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/login/$role'
       preLoaderRoute: typeof LoginRoleRouteImport
       parentRoute: typeof LoginRoute
-    }
-    '/blog/$slug': {
-      id: '/blog/$slug'
-      path: '/$slug'
-      fullPath: '/blog/$slug'
-      preLoaderRoute: typeof BlogSlugRouteImport
-      parentRoute: typeof BlogRoute
     }
     '/article/$slug': {
       id: '/article/$slug'
@@ -715,16 +696,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
-interface BlogRouteChildren {
-  BlogSlugRoute: typeof BlogSlugRoute
-}
-
-const BlogRouteChildren: BlogRouteChildren = {
-  BlogSlugRoute: BlogSlugRoute,
-}
-
-const BlogRouteWithChildren = BlogRoute._addFileChildren(BlogRouteChildren)
-
 interface LoginRouteChildren {
   LoginRoleRoute: typeof LoginRoleRoute
 }
@@ -739,7 +710,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
-  BlogRoute: BlogRouteWithChildren,
+  BlogRoute: BlogRoute,
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
   ContactRoute: ContactRoute,
