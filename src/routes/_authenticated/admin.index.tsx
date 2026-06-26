@@ -8,6 +8,7 @@ import { StaffShell } from "@/components/admin/AdminLayout";
 import { exportCompanyReport, exportCompanyReportPdf } from "@/lib/accounting.functions";
 import { listStaffExpenses, listWholesaleSales } from "@/lib/finance.functions";
 import { ADMIN_REPORT_REGIONS, directionFromCity, formatOrderAmount, formatRegionMoney } from "@/lib/staff-scope";
+import { LIVE_STATS_QUERY_OPTIONS } from "@/lib/live-stats-query";
 import { AlertTriangle, ClipboardList, DollarSign, Download, FileText, HandCoins, MessageSquare, Package, ShoppingCart, Store, TrendingUp } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
@@ -63,24 +64,30 @@ function AdminDashboard() {
   const [exportingPdf, setExportingPdf] = useState(false);
   const { data: products } = useQuery({
     queryKey: ["admin-products"], queryFn: async () => (await supabase.from("products").select("id, price_usd, price_fcfa")).data ?? [],
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: variants } = useQuery({
     queryKey: ["admin-dashboard-variants"],
     queryFn: async () => (await supabase.from("product_variants").select("id, price_usd, price_fcfa")).data ?? [],
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: pos } = useQuery({
     queryKey: ["admin-pos"], queryFn: async () => (await supabase.from("points_of_sale").select("id, city")).data ?? [],
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: stock } = useQuery({
     queryKey: ["admin-low-stock"], queryFn: async () => (await supabase.from("stock").select("*")).data ?? [],
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: orders } = useQuery({
     queryKey: ["admin-dashboard-orders"],
     queryFn: async () => (await supabase.from("orders").select("*").order("created_at", { ascending: false })).data ?? [],
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: reviews } = useQuery({
     queryKey: ["admin-dashboard-reviews"],
     queryFn: async () => (await supabase.from("reviews").select("id, approved")).data ?? [],
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: sales } = useQuery({
     queryKey: ["admin-dashboard-pos-sales"],
@@ -88,14 +95,17 @@ function AdminDashboard() {
       const { data } = await supabase.from("pos_sales").select("total_fcfa,total_usd,created_at,pos_id");
       return data ?? [];
     },
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: expenses = [] } = useQuery({
     queryKey: ["admin-dashboard-expenses"],
     queryFn: () => listExpenses({}),
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: wholesaleSales = [] } = useQuery({
     queryKey: ["admin-dashboard-wholesale"],
     queryFn: () => listWholesale({}),
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
 
   const posScopeById = Object.fromEntries((pos ?? []).map((p: any) => [p.id, directionFromCity(p.city)]));

@@ -1,32 +1,29 @@
 import { Link } from "@tanstack/react-router";
-import { formatProductPrice, type PriceLike } from "@/lib/market";
+import { formatProductPriceRange, type PriceLike } from "@/lib/market";
 import { useMarket } from "@/lib/market-context";
 import { useMarketStock } from "@/lib/use-market-stock";
-import { stockLabel } from "@/lib/stock.functions";
-import { defaultVariant } from "@/lib/product-variants";
 import { productDisplayPrices, type ProductWithVariants } from "@/lib/products";
 
 export function ProductCard({ product }: { product: ProductWithVariants }) {
   const { countryCode } = useMarket();
-  const { availableForProduct, productInStock, isLoading } = useMarketStock();
+  const { productInStock, isLoading } = useMarketStock();
   const variantIds = product.variants.map((v) => v.id);
-  const available = availableForProduct(variantIds);
   const outOfStock = !isLoading && !productInStock(variantIds);
-  const displayVariant = defaultVariant(product.variants);
+  const activeVariants = product.variants.filter((v) => v.is_active);
   const prices = productDisplayPrices(product);
-  const priceItem: PriceLike = displayVariant
-    ? {
-        price_usd: displayVariant.price_usd,
-        price_fcfa: displayVariant.price_fcfa,
-        price_cdf: displayVariant.price_cdf ?? 0,
-        rdc_price_currency: displayVariant.rdc_price_currency ?? "usd",
-      }
-    : {
+  const priceVariants: PriceLike[] = activeVariants.length
+    ? activeVariants.map((v) => ({
+        price_usd: v.price_usd,
+        price_fcfa: v.price_fcfa,
+        price_cdf: v.price_cdf ?? 0,
+        rdc_price_currency: v.rdc_price_currency ?? "usd",
+      }))
+    : [{
         price_usd: prices.price_usd,
         price_fcfa: prices.price_fcfa,
         price_cdf: (product as any).price_cdf ?? 0,
         rdc_price_currency: (product as any).rdc_price_currency ?? "usd",
-      };
+      }];
 
   return (
     <Link
@@ -65,12 +62,9 @@ export function ProductCard({ product }: { product: ProductWithVariants }) {
           {product.description && (
             <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{product.description}</p>
           )}
-          {!isLoading && available > 0 && (
-            <p className="mt-2 text-[10px] uppercase tracking-widest text-muted-foreground">{stockLabel(available)}</p>
-          )}
         </div>
         <div className="text-right shrink-0">
-          <div className="text-sm font-medium text-copper">{formatProductPrice(priceItem, countryCode)}</div>
+          <div className="text-sm font-medium text-copper">{formatProductPriceRange(priceVariants, countryCode)}</div>
         </div>
       </div>
     </Link>

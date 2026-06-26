@@ -1,7 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import heroImg from "@/assets/hero.jpg";
 import { fetchFeaturedProducts } from "@/lib/products";
 import { fetchApprovedReviews, type PublicReview } from "@/lib/reviews";
+import { getPublicReviews } from "@/lib/reviews.functions";
 import { defaultSiteSettings, fetchSiteSettings, type SiteSettings } from "@/lib/site-settings";
 import { ProductCard } from "@/components/site/ProductCard";
 import { ArrowRight, Leaf, ShieldCheck, Truck, HeartHandshake, Star } from "lucide-react";
@@ -146,7 +149,7 @@ function HomePage() {
         </div>
       </section>
 
-      <HomeReviews reviews={reviews} />
+      <HomeReviews initialReviews={reviews} />
 
       {/* CTA */}
       <section className="container-page py-24 text-center">
@@ -163,7 +166,17 @@ function HomePage() {
   );
 }
 
-function HomeReviews({ reviews }: { reviews: PublicReview[] }) {
+function HomeReviews({ initialReviews }: { initialReviews: PublicReview[] }) {
+  const getReviews = useServerFn(getPublicReviews);
+  const { data: reviews = initialReviews } = useQuery({
+    queryKey: ["public-reviews", "home"],
+    queryFn: () => getReviews({ data: { limit: 4 } }),
+    initialData: initialReviews,
+    placeholderData: (prev) => prev ?? initialReviews,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: true,
+  });
   return (
     <section className="container-page py-24">
       <div className="mb-12 max-w-2xl">

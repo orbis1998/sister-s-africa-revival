@@ -17,8 +17,11 @@ export function Reviews({
   const { data: reviews = initialReviews, isLoading } = useQuery({
     queryKey: ["public-reviews", productSlug, refreshKey],
     queryFn: () => getReviews({ data: { productSlug, limit: 50 } }),
-    initialData: refreshKey === 0 ? initialReviews : undefined,
+    initialData: initialReviews,
+    placeholderData: (prev) => prev ?? initialReviews,
     staleTime: 60_000,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: true,
   });
 
   const avg = reviews.length

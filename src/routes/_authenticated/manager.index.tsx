@@ -7,6 +7,7 @@ import { createStaffExpense, createWholesaleSale, listStaffExpenses, listWholesa
 import { listCommuneDeliveryFees, upsertCommuneDeliveryFees } from "@/lib/delivery.functions";
 import { getMyManagerPermissions } from "@/lib/permissions.functions";
 import { directionLabel, formatScopedMoney, directionDeliveryCurrency, directionCurrency } from "@/lib/staff-scope";
+import { LIVE_STATS_QUERY_OPTIONS } from "@/lib/live-stats-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatVariantLabel } from "@/lib/product-variants";
 import { useEffect, useMemo, useState } from "react";
@@ -88,21 +89,25 @@ function ManagerDashboard() {
     queryKey: ["manager-expenses", user?.id],
     queryFn: () => listExpenses({}),
     enabled: canExpenses || canViewAccounting,
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: products = [] } = useQuery({
     queryKey: ["manager-products"],
     queryFn: async () => (await supabase.from("products").select("id,name,slug").eq("is_active", true).order("name")).data ?? [],
     enabled: canWholesale,
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: variants = [] } = useQuery({
     queryKey: ["manager-variants"],
     queryFn: async () => (await supabase.from("product_variants").select("*").eq("is_active", true).order("sort_order")).data ?? [],
     enabled: canWholesale,
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: posList = [] } = useQuery({
     queryKey: ["manager-pos-list", posIds.join(",")],
     enabled: canWholesale && posIds.length > 0,
     queryFn: async () => (await supabase.from("points_of_sale").select("id,name,city").in("id", posIds).order("name")).data ?? [],
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const activePosId = wholesale.pos_id || posList[0]?.id || "";
   useEffect(() => {
@@ -114,26 +119,31 @@ function ManagerDashboard() {
     queryKey: ["manager-pos-stock", activePosId],
     enabled: canWholesale && !!activePosId,
     queryFn: async () => (await supabase.from("stock").select("variant_id,quantity").eq("pos_id", activePosId)).data ?? [],
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: wholesaleSales = [], refetch: refetchWholesale } = useQuery({
     queryKey: ["manager-wholesale-sales", user?.id],
     queryFn: () => listWholesale({}),
     enabled: canWholesale || canViewAccounting,
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: deliveredOrders = [] } = useQuery({
     queryKey: ["manager-delivered-orders", profile?.city_scope],
     enabled: canViewAccounting && !!profile?.city_scope,
     queryFn: async () => (await supabase.from("orders").select("*").eq("status", "delivered").eq("city_scope", profile!.city_scope!).order("delivered_at", { ascending: false }).limit(100)).data ?? [],
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: posSales = [] } = useQuery({
     queryKey: ["manager-pos-sales", posIds.join(",")],
     enabled: canViewAccounting && posIds.length > 0,
     queryFn: async () => (await supabase.from("pos_sales").select("*").in("pos_id", posIds).order("created_at", { ascending: false }).limit(50)).data ?? [],
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: deliveryFees = [], refetch: refetchFees } = useQuery({
     queryKey: ["manager-delivery-fees", profile?.city_scope],
     enabled: canLogistics && !!profile?.city_scope,
     queryFn: () => listFees({ data: { city_scope: profile!.city_scope! } }),
+    ...LIVE_STATS_QUERY_OPTIONS,
   });
   const [feeDraft, setFeeDraft] = useState<Record<string, { local: string }>>({});
   const deliveryCurrency = directionDeliveryCurrency(profile?.city_scope);

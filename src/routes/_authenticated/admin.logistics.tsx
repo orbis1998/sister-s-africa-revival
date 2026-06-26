@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { lookupCommuneDeliveryFee } from "@/lib/delivery.functions";
 import { getStaffStockForCity } from "@/lib/stock.functions";
 import { formatDeliveryFeeByCountry } from "@/lib/staff-scope";
+import { LIVE_STATS_QUERY_OPTIONS } from "@/lib/live-stats-query";
 import { formatVariantLabel } from "@/lib/product-variants";
 
 export const Route = createFileRoute("/_authenticated/admin/logistics")({
@@ -187,8 +188,8 @@ function LogisticsPage() {
     [manual.country_code, manual.city],
   );
 
-  const orders = useQuery({ queryKey: ["orders"], queryFn: () => list() });
-  const drivers = useQuery({ queryKey: ["drivers"], queryFn: () => drv() });
+  const orders = useQuery({ queryKey: ["orders"], queryFn: () => list(), ...LIVE_STATS_QUERY_OPTIONS });
+  const drivers = useQuery({ queryKey: ["drivers"], queryFn: () => drv(), ...LIVE_STATS_QUERY_OPTIONS });
   const products = useQuery({
     queryKey: ["manual-order-products"],
     queryFn: async () => (await supabase.from("products").select("*").eq("is_active", true).order("name")).data ?? [],

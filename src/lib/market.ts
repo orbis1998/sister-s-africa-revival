@@ -59,6 +59,25 @@ export function formatProductPrice(item: PriceLike, market: MarketCountry) {
   return formatMoney(amount, label);
 }
 
+function formatCompactMoney(amount: number, label: "USD" | "CDF" | "FCFA") {
+  if (label === "USD") {
+    const n = Number(amount);
+    return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
+  }
+  return `${Number(amount).toLocaleString("fr-FR")} ${label}`;
+}
+
+/** Min–max across variants, e.g. $15 – $25 when prices differ. */
+export function formatProductPriceRange(variants: PriceLike[], market: MarketCountry) {
+  if (!variants.length) return formatProductPrice({}, market);
+  const priced = variants.map((v) => productUnitPrice(v, market));
+  const min = Math.min(...priced.map((p) => p.amount));
+  const max = Math.max(...priced.map((p) => p.amount));
+  const label = priced[0]!.label;
+  if (min === max) return formatCompactMoney(min, label);
+  return `${formatCompactMoney(min, label)} – ${formatCompactMoney(max, label)}`;
+}
+
 export function formatLineTotal(amount: number, label: "USD" | "CDF" | "FCFA", qty = 1) {
   return formatMoney(amount * qty, label);
 }
