@@ -37,6 +37,13 @@ export const defaultSiteSettings: SiteSettings = {
   pos_page_cta_label: "Découvrir les produits",
   pos_page_cta_href: "/products",
   pos_page_cta_secondary_label: "Nous écrire sur WhatsApp",
+  expedition_page_eyebrow: "Expédition",
+  expedition_page_title: "Nos destinations d'expédition",
+  expedition_page_cta_label: "Découvrir les produits",
+  expedition_page_cta_href: "/products",
+  expedition_page_cta_secondary_label: "Nous écrire sur WhatsApp",
+  contact_page_eyebrow: "Contact",
+  contact_page_title: "Nous livrons partout en Afrique centrale et au-delà.",
   story_eyebrow: "Notre histoire",
   story_title: "Deux sœurs, une mission : redéfinir la beauté africaine.",
   story_paragraph_1:

@@ -172,6 +172,16 @@
   }
 }
 
+@utility input-qty {
+  appearance: textfield;
+  -moz-appearance: textfield;
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+}
+
 @utility input-admin {
   width: 100%;
   border: 1px solid var(--border);

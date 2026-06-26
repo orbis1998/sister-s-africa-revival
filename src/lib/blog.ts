@@ -12,10 +12,13 @@ export type BlogPostPublic = {
   sort_order: number;
   seo_title: string | null;
   seo_description: string | null;
+  public_page: "points_de_vente" | "expedition" | "both";
   created_at: string;
 };
 
-const select = "id, slug, title, excerpt, content_html, cover_image_url, category, read_time, sort_order, seo_title, seo_description, created_at";
+const select = "id, slug, title, excerpt, content_html, cover_image_url, category, read_time, sort_order, seo_title, seo_description, public_page, created_at";
+
+export type BlogPublicPage = "points_de_vente" | "expedition";
 
 export function slugifyBlogTitle(title: string) {
   return title
@@ -32,11 +35,13 @@ export function blogPostPathKey(post: { slug: string; id: string }) {
   return slug || post.id;
 }
 
-export async function fetchPublishedBlogPosts() {
+export async function fetchPublishedBlogPosts(page: BlogPublicPage = "points_de_vente") {
+  const pages = page === "points_de_vente" ? ["points_de_vente", "both"] : ["expedition", "both"];
   const { data, error } = await supabase
     .from("blog_posts")
     .select(select)
     .eq("is_published", true)
+    .in("public_page", pages)
     .order("sort_order", { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []) as BlogPostPublic[];

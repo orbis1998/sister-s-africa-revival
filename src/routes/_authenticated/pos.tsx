@@ -25,7 +25,7 @@ function PosDashboard() {
     customer_phone: "",
     product_id: "",
     variant_id: "",
-    qty: 1,
+    qty: "",
     payment_method: "cash",
     items: [],
   });
@@ -154,7 +154,7 @@ function PosDashboard() {
     },
     onSuccess: () => {
       toast.success("Vente enregistrée — stock mis à jour");
-      setSale({ customer_name: "", customer_phone: "", product_id: "", variant_id: "", qty: 1, payment_method: "cash", items: [] });
+      setSale({ customer_name: "", customer_phone: "", product_id: "", variant_id: "", qty: "", payment_method: "cash", items: [] });
       qc.invalidateQueries({ queryKey: ["pos-sales", activePosId] });
       qc.invalidateQueries({ queryKey: ["pos-stock", activePosId] });
     },
@@ -215,13 +215,26 @@ function PosDashboard() {
                 {selectedProduct && (
                   <p className="text-xs text-muted-foreground">Stock disponible : {availableQty} unité{availableQty !== 1 ? "s" : ""}</p>
                 )}
-                <input type="number" min={1} value={sale.qty} onChange={(e) => setSale({ ...sale, qty: parseInt(e.target.value) || 1 })} className="input-admin" />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Qté"
+                  value={sale.qty}
+                  onChange={(e) => setSale({ ...sale, qty: e.target.value.replace(/\D/g, "") })}
+                  className="input-admin input-qty"
+                />
                 <button
                   type="button"
-                  disabled={!selectedProduct || !selectedVariant || availableQty <= 0}
+                  disabled={!selectedProduct || !selectedVariant || availableQty <= 0 || !sale.qty}
                   onClick={() => {
                     if (!selectedProduct || !selectedVariant) return;
-                    const qty = Number(sale.qty || 1);
+                    const parsedQty = Number.parseInt(sale.qty, 10);
+                    if (!parsedQty || parsedQty < 1) {
+                      toast.error("Indiquez une quantité valide");
+                      return;
+                    }
+                    const qty = parsedQty;
                     if (qty > availableQty) {
                       toast.error(`Stock insuffisant (${availableQty} disponible)`);
                       return;
@@ -241,7 +254,7 @@ function PosDashboard() {
                     const nextItems = existingIndex >= 0
                       ? sale.items.map((current: any, index: number) => index === existingIndex ? { ...current, qty: current.qty + item.qty } : current)
                       : [...sale.items, item];
-                    setSale({ ...sale, product_id: "", variant_id: "", qty: 1, items: nextItems });
+                    setSale({ ...sale, product_id: "", variant_id: "", qty: "", items: nextItems });
                   }}
                   className="rounded bg-espresso px-4 py-2 text-xs font-medium uppercase tracking-widest text-cream disabled:opacity-50"
                 >

@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, Package, Boxes, Store, LogOut, Truck, Briefcase, ClipboardList, Star, Settings, ShoppingCart, HandCoins, BookOpen, Wallet } from "lucide-react";
+import { LayoutDashboard, Users, Package, Boxes, Store, LogOut, Truck, Briefcase, ClipboardList, Star, Settings, ShoppingCart, HandCoins, BookOpen, Wallet, MapPin, Plane } from "lucide-react";
 import { useAuth, type AppRole } from "@/lib/auth";
 import { useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -50,8 +50,10 @@ const adminLinks: NavLink[] = [
   { to: "/admin/logistics", label: "Logistique", icon: ClipboardList },
   { to: "/admin/wholesale", label: "Vente en gros", icon: HandCoins },
   { to: "/admin/reviews", label: "Avis clients", icon: Star },
-  { to: "/admin/blog", label: "Blog", icon: BookOpen },
-  { to: "/admin/pos", label: "Points de vente", icon: Store },
+  { to: "/admin/blog", label: "Points de vente", icon: BookOpen },
+  { to: "/admin/expedition-page", label: "Expédition", icon: Plane },
+  { to: "/admin/contact-page", label: "Contact", icon: MapPin },
+  { to: "/admin/pos", label: "Magasins POS", icon: Store },
   { to: "/admin/settings", label: "Paramètres", icon: Settings },
 ];
 

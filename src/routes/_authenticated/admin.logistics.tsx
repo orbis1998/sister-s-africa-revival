@@ -2,12 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listOrders, listDrivers, assignOrder, updateOrderStatus, createStaffOrder } from "@/lib/orders.functions";
+import { listOrders, listDrivers, assignOrder, updateOrderStatus, createStaffOrder, updateStaffOrder } from "@/lib/orders.functions";
 import { directionFromCity, formatScopedMoney, directionCurrency, formatDeliveryFee } from "@/lib/staff-scope";
 import { formatCollectLabel } from "@/lib/seo";
 import { countries, findCountry, communeHasZones, communeZones, deliveryLocationLabel } from "@/lib/locations";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, MessageCircle, Phone, MapPin, Plus, Trash2 } from "lucide-react";
+import { Loader2, MessageCircle, Phone, MapPin, Plus, Trash2, Pencil, ArrowUpDown, Calendar, Archive, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import { lookupCommuneDeliveryFee } from "@/lib/delivery.functions";
@@ -90,17 +90,92 @@ function formatManualOrderSummary(
   };
 }
 
+type SortKey = "date_desc" | "date_asc" | "delivery" | "status";
+
+function sortOrders(orders: any[], sortBy: SortKey) {
+  const copy = [...orders];
+  if (sortBy === "date_asc") {
+    return copy.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }
+  if (sortBy === "delivery") {
+    return copy.sort((a, b) => {
+      const da = a.delivery_date ?? "9999-12-31";
+      const db = b.delivery_date ?? "9999-12-31";
+      return da.localeCompare(db) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }
+  if (sortBy === "status") {
+    const order = STATUS_OPTIONS.map((s) => s.value);
+    return copy.sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+  return copy.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+function groupOrdersByDate(orders: any[]) {
+  const groups = new Map<string, any[]>();
+  for (const order of orders) {
+    const label = new Date(order.created_at).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    const bucket = groups.get(label) ?? [];
+    bucket.push(order);
+    groups.set(label, bucket);
+  }
+  return Array.from(groups.entries()).map(([label, items]) => ({ label, items }));
+}
+
+function orderMatchesCalendarDate(order: any, dateKey: string) {
+  if (!dateKey) return true;
+  const created = new Date(order.created_at).toISOString().slice(0, 10);
+  const delivery = (order.delivery_date ?? "").slice(0, 10);
+  return created === dateKey || delivery === dateKey;
+}
+
+function isArchivedOrder(order: any) {
+  return order.status === "delivered" || order.status === "cancelled";
+}
+
+function orderToEditForm(order: any) {
+  return {
+    id: order.id,
+    order_number: order.order_number,
+    customer_name: order.customer_name ?? "",
+    customer_phone: order.customer_phone ?? "",
+    country_code: order.country_code ?? "CD",
+    city: order.city ?? "",
+    commune: order.commune ?? "",
+    delivery_zone: order.delivery_zone ?? "",
+    address: order.address ?? "",
+    delivery_date: order.delivery_date ?? "",
+    delivery_time: order.delivery_time ?? "",
+    notes: order.notes ?? "",
+    items: Array.isArray(order.items) ? [...order.items] : [],
+    assigned_to: order.assigned_to ?? "",
+  };
+}
+
 function LogisticsPage() {
   const list = useServerFn(listOrders);
   const drv = useServerFn(listDrivers);
   const assign = useServerFn(assignOrder);
   const upd = useServerFn(updateOrderStatus);
   const createManual = useServerFn(createStaffOrder);
+  const updateOrderFn = useServerFn(updateStaffOrder);
   const lookupFee = useServerFn(lookupCommuneDeliveryFee);
   const staffStockFn = useServerFn(getStaffStockForCity);
   const qc = useQueryClient();
   const [filter, setFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<SortKey>("date_desc");
+  const [calendarDate, setCalendarDate] = useState("");
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [editForm, setEditForm] = useState<any>(null);
+  const [editProduct, setEditProduct] = useState({ product_id: "", variant_id: "", qty: "" });
+  const [editDeliveryFee, setEditDeliveryFee] = useState(0);
+  const [editFeeLoading, setEditFeeLoading] = useState(false);
   const minDeliveryDate = tomorrowInputDate();
   const [manual, setManual] = useState<any>(() => emptyManualOrder(minDeliveryDate));
   const [manualProduct, setManualProduct] = useState({ product_id: "", variant_id: "", qty: "" });
@@ -214,7 +289,244 @@ function LogisticsPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const filtered = (orders.data ?? []).filter((o: any) => filter === "all" ? true : o.status === filter);
+  const filtered = (orders.data ?? []).filter((o: any) => {
+    if (filter !== "all" && o.status !== filter) return false;
+    return orderMatchesCalendarDate(o, calendarDate);
+  });
+  const activeOrders = useMemo(
+    () => sortOrders(filtered.filter((o: any) => !isArchivedOrder(o)), sortBy),
+    [filtered, sortBy],
+  );
+  const archivedOrders = useMemo(
+    () => sortOrders(filtered.filter((o: any) => isArchivedOrder(o)), sortBy),
+    [filtered, sortBy],
+  );
+  const groupedActive = useMemo(() => groupOrdersByDate(activeOrders), [activeOrders]);
+  const groupedArchived = useMemo(() => groupOrdersByDate(archivedOrders), [archivedOrders]);
+
+  const editCity = useMemo(
+    () => editForm ? findCountry(editForm.country_code)?.cities.find((c) => c.name === editForm.city) : undefined,
+    [editForm],
+  );
+  const editNeedsZone = editForm ? communeHasZones(editCity, editForm.commune) : false;
+  const editZones = editForm ? communeZones(editCity, editForm.commune) : [];
+  const editSelectedProduct = products.data?.find((product: any) => product.id === editProduct.product_id);
+  const editProductVariants = useMemo(() => {
+    if (!editSelectedProduct) return [];
+    const rows = (variants.data ?? []).filter((v: any) => v.product_id === editSelectedProduct.id);
+    if (rows.length) return rows;
+    return [{
+      id: editSelectedProduct.id,
+      product_id: editSelectedProduct.id,
+      weight_value: 1,
+      weight_unit: "kg",
+      price_usd: editSelectedProduct.price_usd,
+      price_fcfa: editSelectedProduct.price_fcfa,
+    }];
+  }, [editSelectedProduct, variants.data]);
+  const editSelectedVariant = editProductVariants.find((v: any) => v.id === editProduct.variant_id) ?? editProductVariants[0];
+  const editStock = useQuery({
+    queryKey: ["edit-order-stock", editForm?.country_code, editForm?.city],
+    enabled: !!editForm?.city,
+    queryFn: () => staffStockFn({ data: { country_code: editForm!.country_code, city: editForm!.city } }),
+  });
+  const editStockForVariant = (variantId: string) => Number((editStock.data as Record<string, number> | undefined)?.[variantId] ?? 0);
+  const editQtyInOrder = (variantId: string) =>
+    (editForm?.items ?? [])
+      .filter((item: any) => item.variantId === variantId)
+      .reduce((sum: number, item: any) => sum + Number(item.qty ?? 0), 0);
+  const editSelectedAvailable = editSelectedVariant ? editStockForVariant(editSelectedVariant.id) : 0;
+  const editSelectedRemaining = editSelectedVariant
+    ? Math.max(0, editSelectedAvailable - editQtyInOrder(editSelectedVariant.id))
+    : 0;
+  const editTotals = useMemo(() => {
+    return (editForm?.items ?? []).reduce((sum: { usd: number; fcfa: number }, item: any) => ({
+      usd: sum.usd + Number(item.priceUsd ?? 0) * Number(item.qty ?? 1),
+      fcfa: sum.fcfa + Number(item.priceFcfa ?? 0) * Number(item.qty ?? 1),
+    }), { usd: 0, fcfa: 0 });
+  }, [editForm?.items]);
+  const editSummary = useMemo(
+    () => editForm ? formatManualOrderSummary(editTotals, editDeliveryFee, editForm.country_code) : null,
+    [editForm, editTotals, editDeliveryFee],
+  );
+
+  useEffect(() => {
+    if (!editForm?.city || !editForm?.commune) {
+      setEditDeliveryFee(0);
+      return;
+    }
+    if (editNeedsZone && !editForm.delivery_zone) {
+      setEditDeliveryFee(0);
+      return;
+    }
+    let cancelled = false;
+    setEditFeeLoading(true);
+    lookupFee({
+      data: {
+        country_code: editForm.country_code,
+        city: editForm.city,
+        commune: editForm.commune,
+        zone: editForm.delivery_zone || undefined,
+      },
+    })
+      .then((fee) => { if (!cancelled) setEditDeliveryFee(fee.fee_fcfa ?? 0); })
+      .catch(() => { if (!cancelled) setEditDeliveryFee(0); })
+      .finally(() => { if (!cancelled) setEditFeeLoading(false); });
+    return () => { cancelled = true; };
+  }, [editForm?.country_code, editForm?.city, editForm?.commune, editForm?.delivery_zone, editNeedsZone, lookupFee]);
+
+  const updateMut = useMutation({
+    mutationFn: (payload: any) => updateOrderFn({ data: payload }),
+    onSuccess: () => {
+      toast.success("Commande mise à jour");
+      setEditForm(null);
+      setEditProduct({ product_id: "", variant_id: "", qty: "" });
+      qc.invalidateQueries({ queryKey: ["orders"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  function openEdit(order: any) {
+    setEditForm(orderToEditForm(order));
+    setEditProduct({ product_id: "", variant_id: "", qty: "" });
+    setEditDeliveryFee(order.delivery_fee_fcfa ?? 0);
+  }
+
+  function renderOrderCard(o: any) {
+    const meta = statusMeta(o.status);
+    const itemsTxt = (o.items as any[]).map((it) => `• ${it.qty} × ${it.name} (${it.variantLabel})`).join("\n");
+    const productsLabel = formatScopedMoney(o, o.city_scope);
+    const deliveryLabelMoney = formatDeliveryFee(o.delivery_fee_fcfa ?? 0, o.city_scope);
+    const collectLabel = formatCollectLabel(o, directionCurrency(o.city_scope) as "FCFA" | "USD");
+    const customerMsg = `Bonjour ${o.customer_name}, votre commande *${o.order_number}* chez The Sisters est maintenant *${meta.label.toLowerCase()}*.\n\n${itemsTxt}\n\nProduits : ${productsLabel}\nLivraison : ${deliveryLabelMoney}\nTotal : ${collectLabel}`;
+    const driverMsg = o.driver ? `Bonjour ${o.driver.full_name ?? ""}, nouvelle livraison à effectuer :\n\nCommande : *${o.order_number}*\nClient : ${o.customer_name} (${o.customer_phone})\nAdresse : ${o.address}, ${o.commune}, ${o.city}\nLivraison : ${deliveryLabel(o)}\n${o.notes ? "Notes : " + o.notes + "\n" : ""}\nArticles :\n${itemsTxt}\n\nSolde produits : ${productsLabel}\nFrais livraison : ${deliveryLabelMoney}\nTotal à encaisser : ${collectLabel}` : "";
+    const canEdit = !["delivered", "cancelled"].includes(o.status);
+    const scopedDrivers = (drivers.data ?? []).filter((d: any) => !o.city_scope || d.city_scope === o.city_scope);
+
+    return (
+      <div key={o.id} className="bg-card border border-border rounded p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <span className="font-display text-xl text-espresso">{o.order_number}</span>
+              <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded-full ${meta.tone}`}>{meta.label}</span>
+            </div>
+            <div className="text-xs text-muted-foreground">{new Date(o.created_at).toLocaleString("fr-FR")}</div>
+            <div className="mt-1 text-xs text-copper">Livraison : {deliveryLabel(o)}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Solde produits</div>
+            <div className="font-display text-2xl text-copper">{productsLabel}</div>
+            {(o.delivery_fee_fcfa || o.delivery_fee_usd) ? (
+              <div className="mt-1 text-xs text-muted-foreground">
+                + livraison {deliveryLabelMoney} · encaisser {collectLabel}
+              </div>
+            ) : null}
+            <div className="text-xs text-muted-foreground">{o.city}</div>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4 text-sm mb-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Client</div>
+            <div className="text-espresso">{o.customer_name}</div>
+            <div className="text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" />{o.customer_phone}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Livraison</div>
+            <div className="text-espresso flex items-start gap-1"><MapPin className="w-3 h-3 mt-1 shrink-0" /><span>{o.address}<br/>{deliveryLocationLabel(o.commune, o.delivery_zone)}, {o.city} — {o.country_name}</span></div>
+            <div className="mt-1 text-xs text-muted-foreground">{deliveryLabel(o)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Articles</div>
+            <ul className="text-espresso/80 space-y-0.5">
+              {(o.items as any[]).map((it, i) => (
+                <li key={i}>{it.qty} × {it.name} <span className="text-muted-foreground">({it.variantLabel})</span></li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {o.notes && <div className="text-xs bg-cream/60 border border-border rounded p-2 mb-4"><strong>Notes :</strong> {o.notes}</div>}
+
+        <div className="grid md:grid-cols-[1fr_1fr_1fr_auto] gap-3 pt-4 border-t border-border">
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground block mb-1">Livreur</span>
+            <select
+              value={o.assigned_to ?? ""}
+              onChange={(e) => assignMut.mutate({ order_id: o.id, driver_id: e.target.value || null })}
+              className="w-full bg-cream border border-input rounded px-3 py-2 text-sm"
+            >
+              <option value="">— Non assigné —</option>
+              {scopedDrivers.map((d: any) => (
+                <option key={d.id} value={d.id}>{d.full_name ?? "Sans nom"}{d.badge_id ? ` (${d.badge_id})` : ""}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground block mb-1">Statut</span>
+            <select
+              value={o.status}
+              onChange={(e) => statusMut.mutate({ order_id: o.id, status: e.target.value })}
+              className="w-full bg-cream border border-input rounded px-3 py-2 text-sm"
+            >
+              {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </label>
+          <div className="flex flex-col gap-2 justify-end">
+            <a
+              href={buildWhatsAppLink(o.customer_phone, customerMsg)}
+              target="_blank" rel="noreferrer"
+              className="flex items-center justify-center gap-2 bg-[#25D366] text-white text-xs font-medium px-3 py-2 rounded hover:opacity-90"
+            >
+              <MessageCircle className="w-3.5 h-3.5" /> Notifier le client
+            </a>
+            {o.driver?.phone && (
+              <a
+                href={buildWhatsAppLink(o.driver.phone, driverMsg)}
+                target="_blank" rel="noreferrer"
+                className="flex items-center justify-center gap-2 bg-espresso text-cream text-xs font-medium px-3 py-2 rounded hover:opacity-90"
+              >
+                <MessageCircle className="w-3.5 h-3.5" /> Notifier le livreur
+              </a>
+            )}
+          </div>
+          {canEdit && (
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => openEdit(o)}
+                className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs uppercase tracking-widest hover:bg-cream/60"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Modifier
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderOrderGroups(groups: { label: string; items: any[] }[]) {
+    if (!groups.length) return null;
+    return (
+      <div className="space-y-10">
+        {groups.map((group) => (
+          <section key={group.label}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="font-display text-2xl text-espresso capitalize">{group.label}</h2>
+              <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                {group.items.length} commande{group.items.length > 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className="space-y-4">
+              {group.items.map((o: any) => renderOrderCard(o))}
+            </div>
+          </section>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <StaffShell title="Commandes" requiredRole={["admin", "manager"]} requiredPermission={["can_manage_orders", "can_manage_logistics"]}>
@@ -223,10 +535,39 @@ function LogisticsPage() {
           <div className="eyebrow mb-2">Logistique</div>
           <h1 className="font-display text-4xl text-espresso">Commandes & livraisons</h1>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           <button onClick={() => setManualOpen((v) => !v)} className="inline-flex items-center gap-2 rounded-full bg-espresso px-4 py-2 text-xs font-medium uppercase tracking-widest text-cream">
             <Plus className="h-3.5 w-3.5" /> Commande manuelle
           </button>
+          <label className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs cursor-pointer hover:bg-cream/40">
+            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground hidden sm:inline">Date</span>
+            <input
+              type="date"
+              value={calendarDate}
+              onChange={(e) => setCalendarDate(e.target.value)}
+              className="bg-transparent outline-none cursor-pointer max-w-[9rem]"
+            />
+            {calendarDate && (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); setCalendarDate(""); }}
+                className="text-muted-foreground hover:text-espresso"
+                aria-label="Effacer la date"
+              >
+                ×
+              </button>
+            )}
+          </label>
+          <label className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs">
+            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)} className="bg-transparent outline-none">
+              <option value="date_desc">Date ↓ récent</option>
+              <option value="date_asc">Date ↑ ancien</option>
+              <option value="delivery">Date de livraison</option>
+              <option value="status">Statut</option>
+            </select>
+          </label>
           <button onClick={() => setFilter("all")} className={`px-3 py-1.5 text-xs rounded-full border ${filter==="all"?"bg-espresso text-cream border-espresso":"border-border"}`}>Toutes</button>
           {STATUS_OPTIONS.map((s) => (
             <button key={s.value} onClick={() => setFilter(s.value)} className={`px-3 py-1.5 text-xs rounded-full border ${filter===s.value?"bg-espresso text-cream border-espresso":"border-border"}`}>{s.label}</button>
@@ -330,7 +671,7 @@ function LogisticsPage() {
                 placeholder="Qté"
                 value={manualProduct.qty}
                 onChange={(e) => setManualProduct({ ...manualProduct, qty: e.target.value.replace(/\D/g, "") })}
-                className="input-admin"
+                className="input-admin input-qty"
               />
               <button
                 type="button"
@@ -431,110 +772,202 @@ function LogisticsPage() {
 
       {orders.isLoading ? (
         <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Chargement…</div>
-      ) : filtered.length === 0 ? (
-        <div className="bg-card border border-border rounded p-12 text-center text-muted-foreground">Aucune commande pour ce filtre.</div>
+      ) : activeOrders.length === 0 && archivedOrders.length === 0 ? (
+        <div className="bg-card border border-border rounded p-12 text-center text-muted-foreground">
+          {calendarDate ? "Aucune commande pour cette date." : "Aucune commande pour ce filtre."}
+        </div>
       ) : (
-        <div className="space-y-4">
-          {filtered.map((o: any) => {
-            const meta = statusMeta(o.status);
-            const itemsTxt = (o.items as any[]).map((it) => `• ${it.qty} × ${it.name} (${it.variantLabel})`).join("\n");
-            const productsLabel = formatScopedMoney(o, o.city_scope);
-            const deliveryLabelMoney = formatDeliveryFee(o.delivery_fee_fcfa ?? 0, o.city_scope);
-            const collectLabel = formatCollectLabel(o, directionCurrency(o.city_scope) as "FCFA" | "USD");
-            const customerMsg = `Bonjour ${o.customer_name}, votre commande *${o.order_number}* chez The Sisters est maintenant *${meta.label.toLowerCase()}*.\n\n${itemsTxt}\n\nProduits : ${productsLabel}\nLivraison : ${deliveryLabelMoney}\nTotal : ${collectLabel}`;
-            const driverMsg = o.driver ? `Bonjour ${o.driver.full_name ?? ""}, nouvelle livraison à effectuer :\n\nCommande : *${o.order_number}*\nClient : ${o.customer_name} (${o.customer_phone})\nAdresse : ${o.address}, ${o.commune}, ${o.city}\nLivraison : ${deliveryLabel(o)}\n${o.notes ? "Notes : " + o.notes + "\n" : ""}\nArticles :\n${itemsTxt}\n\nSolde produits : ${productsLabel}\nFrais livraison : ${deliveryLabelMoney}\nTotal à encaisser : ${collectLabel}` : "";
-            return (
-              <div key={o.id} className="bg-card border border-border rounded p-5">
-                <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+        <>
+          {activeOrders.length > 0 ? (
+            renderOrderGroups(groupedActive)
+          ) : (
+            <div className="mb-8 rounded-2xl border border-dashed border-border bg-cream/30 p-8 text-center text-sm text-muted-foreground">
+              Aucune commande active{calendarDate ? " pour cette date" : ""}. Consultez les archives ci-dessous.
+            </div>
+          )}
+
+          {archivedOrders.length > 0 && (
+            <section className="mt-12 border-t border-border pt-8">
+              <button
+                type="button"
+                onClick={() => setArchiveOpen((v) => !v)}
+                className="flex w-full items-center justify-between gap-4 rounded-2xl border border-border bg-cream/40 px-5 py-4 text-left hover:bg-cream/60"
+              >
+                <div className="flex items-center gap-3">
+                  <Archive className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="font-display text-xl text-espresso">{o.order_number}</span>
-                      <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded-full ${meta.tone}`}>{meta.label}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">{new Date(o.created_at).toLocaleString("fr-FR")}</div>
-                    <div className="mt-1 text-xs text-copper">Livraison : {deliveryLabel(o)}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Solde produits</div>
-                    <div className="font-display text-2xl text-copper">{productsLabel}</div>
-                    {(o.delivery_fee_fcfa || o.delivery_fee_usd) ? (
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        + livraison {deliveryLabelMoney} · encaisser {collectLabel}
-                      </div>
-                    ) : null}
-                    <div className="text-xs text-muted-foreground">{o.city}</div>
+                    <h2 className="font-display text-xl text-espresso">Archives</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Commandes livrées et annulées · {archivedOrders.length} commande{archivedOrders.length > 1 ? "s" : ""}
+                    </p>
                   </div>
                 </div>
-
-                <div className="grid md:grid-cols-3 gap-4 text-sm mb-4">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Client</div>
-                    <div className="text-espresso">{o.customer_name}</div>
-                    <div className="text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" />{o.customer_phone}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Livraison</div>
-                    <div className="text-espresso flex items-start gap-1"><MapPin className="w-3 h-3 mt-1 shrink-0" /><span>{o.address}<br/>{deliveryLocationLabel(o.commune, o.delivery_zone)}, {o.city} — {o.country_name}</span></div>
-                    <div className="mt-1 text-xs text-muted-foreground">{deliveryLabel(o)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Articles</div>
-                    <ul className="text-espresso/80 space-y-0.5">
-                      {(o.items as any[]).map((it, i) => (
-                        <li key={i}>{it.qty} × {it.name} <span className="text-muted-foreground">({it.variantLabel})</span></li>
-                      ))}
-                    </ul>
-                  </div>
+                {archiveOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+              </button>
+              {archiveOpen && (
+                <div className="mt-6 opacity-90">
+                  {renderOrderGroups(groupedArchived)}
                 </div>
+              )}
+            </section>
+          )}
+        </>
+      )}
 
-                {o.notes && <div className="text-xs bg-cream/60 border border-border rounded p-2 mb-4"><strong>Notes :</strong> {o.notes}</div>}
-
-                <div className="grid md:grid-cols-3 gap-3 pt-4 border-t border-border">
-                  <label className="block">
-                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground block mb-1">Livreur</span>
-                    <select
-                      value={o.assigned_to ?? ""}
-                      onChange={(e) => assignMut.mutate({ order_id: o.id, driver_id: e.target.value || null })}
-                      className="w-full bg-cream border border-input rounded px-3 py-2 text-sm"
-                    >
-                      <option value="">— Non assigné —</option>
-                      {(drivers.data ?? []).map((d: any) => (
-                        <option key={d.id} value={d.id}>{d.full_name ?? "Sans nom"}{d.badge_id ? ` (${d.badge_id})` : ""}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground block mb-1">Statut</span>
-                    <select
-                      value={o.status}
-                      onChange={(e) => statusMut.mutate({ order_id: o.id, status: e.target.value })}
-                      className="w-full bg-cream border border-input rounded px-3 py-2 text-sm"
-                    >
-                      {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
-                  </label>
-                  <div className="flex flex-col gap-2 justify-end">
-                    <a
-                      href={buildWhatsAppLink(o.customer_phone, customerMsg)}
-                      target="_blank" rel="noreferrer"
-                      className="flex items-center justify-center gap-2 bg-[#25D366] text-white text-xs font-medium px-3 py-2 rounded hover:opacity-90"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" /> Notifier le client
-                    </a>
-                    {o.driver?.phone && (
-                      <a
-                        href={buildWhatsAppLink(o.driver.phone, driverMsg)}
-                        target="_blank" rel="noreferrer"
-                        className="flex items-center justify-center gap-2 bg-espresso text-cream text-xs font-medium px-3 py-2 rounded hover:opacity-90"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" /> Notifier le livreur
-                      </a>
-                    )}
-                  </div>
-                </div>
+      {editForm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center" onClick={() => setEditForm(null)}>
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-auto rounded-2xl bg-card p-6 shadow-elegant" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-display text-2xl">Modifier {editForm.order_number}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Adresse, produits, livreur et notes peuvent être mis à jour.</p>
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              <input placeholder="Nom client" value={editForm.customer_name} onChange={(e) => setEditForm({ ...editForm, customer_name: e.target.value })} className="input-admin" />
+              <input placeholder="Téléphone client" value={editForm.customer_phone} onChange={(e) => setEditForm({ ...editForm, customer_phone: e.target.value })} className="input-admin" />
+              <select value={editForm.country_code} onChange={(e) => {
+                const countryCode = e.target.value;
+                const country = findCountry(countryCode) ?? countries[0];
+                setEditForm({ ...editForm, country_code: countryCode, city: country.cities[0]?.name ?? "", commune: "", delivery_zone: "" });
+              }} className="input-admin">
+                {countries.map((country) => <option key={country.code} value={country.code}>{country.name}</option>)}
+              </select>
+              <select value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value, commune: "", delivery_zone: "" })} className="input-admin">
+                <option value="">Sélectionner une ville…</option>
+                {(findCountry(editForm.country_code)?.cities ?? []).map((city) => <option key={city.name} value={city.name}>{city.name}</option>)}
+              </select>
+              <select value={editForm.commune} onChange={(e) => setEditForm({ ...editForm, commune: e.target.value, delivery_zone: "" })} disabled={!editCity} className="input-admin">
+                <option value="">{editCity ? "Sélectionner une commune…" : "Choisissez d'abord la ville"}</option>
+                {editCity?.communes.map((commune) => <option key={commune.name} value={commune.name}>{commune.name}</option>)}
+              </select>
+              {editNeedsZone && (
+                <select value={editForm.delivery_zone} onChange={(e) => setEditForm({ ...editForm, delivery_zone: e.target.value })} className="input-admin">
+                  <option value="">Sélectionner un quartier / zone…</option>
+                  {editZones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+                </select>
+              )}
+              <input placeholder="Adresse précise" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} className="input-admin" />
+              <input type="date" value={editForm.delivery_date ?? ""} onChange={(e) => setEditForm({ ...editForm, delivery_date: e.target.value })} className="input-admin" />
+              <input type="time" value={editForm.delivery_time ?? ""} onChange={(e) => setEditForm({ ...editForm, delivery_time: e.target.value })} className="input-admin" />
+              <select value={editForm.assigned_to} onChange={(e) => setEditForm({ ...editForm, assigned_to: e.target.value })} className="input-admin">
+                <option value="">— Non assigné —</option>
+                {(drivers.data ?? [])
+                  .filter((driver: any) => driver.city_scope === directionFromCity(editForm.city, editForm.country_code))
+                  .map((driver: any) => <option key={driver.id} value={driver.id}>{driver.full_name ?? "Livreur"}{driver.badge_id ? ` (${driver.badge_id})` : ""}</option>)}
+              </select>
+              <textarea placeholder="Notes" value={editForm.notes ?? ""} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} className="input-admin resize-none md:col-span-3" rows={3} />
+            </div>
+            <div className="mt-5 rounded-2xl border border-border bg-cream/60 p-4">
+              <div className="grid gap-3 md:grid-cols-[1fr_1fr_100px_auto]">
+                <select value={editProduct.product_id} onChange={(e) => setEditProduct({ product_id: e.target.value, variant_id: "", qty: editProduct.qty })} className="input-admin">
+                  <option value="">Sélectionner un produit</option>
+                  {(products.data ?? []).map((product: any) => {
+                    const productVariantRows = (variants.data ?? []).filter((v: any) => v.product_id === product.id);
+                    const variantIds = productVariantRows.length ? productVariantRows.map((v: any) => v.id) : [product.id];
+                    const avail = variantIds.reduce((sum: number, id: string) => sum + editStockForVariant(id), 0);
+                    return (
+                      <option key={product.id} value={product.id} disabled={avail <= 0}>
+                        {product.name}{avail <= 0 ? " — Fini en stock" : ` (${avail} dispo)`}
+                      </option>
+                    );
+                  })}
+                </select>
+                {editSelectedProduct && editProductVariants.length > 0 && (
+                  <select value={editProduct.variant_id || editSelectedVariant?.id || ""} onChange={(e) => setEditProduct({ ...editProduct, variant_id: e.target.value })} className="input-admin">
+                    {editProductVariants.map((v: any) => {
+                      const avail = editStockForVariant(v.id);
+                      return (
+                        <option key={v.id} value={v.id} disabled={avail <= 0}>
+                          {formatVariantLabel(Number(v.weight_value), v.weight_unit)}
+                          {avail <= 0 ? " — Fini en stock" : ` (${avail} dispo)`}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+                <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="Qté" value={editProduct.qty} onChange={(e) => setEditProduct({ ...editProduct, qty: e.target.value.replace(/\D/g, "") })} className="input-admin input-qty" />
+                <button
+                  type="button"
+                  className="rounded bg-espresso px-4 py-2 text-xs font-medium uppercase tracking-widest text-cream disabled:opacity-50"
+                  disabled={!editSelectedProduct || !editSelectedVariant || editSelectedRemaining <= 0 || !editProduct.qty}
+                  onClick={() => {
+                    if (!editSelectedProduct || !editSelectedVariant) return;
+                    const parsedQty = Number.parseInt(editProduct.qty, 10);
+                    if (!parsedQty || parsedQty < 1) { toast.error("Indiquez une quantité valide"); return; }
+                    const qty = Math.min(editSelectedRemaining, parsedQty);
+                    const label = formatVariantLabel(Number(editSelectedVariant.weight_value), editSelectedVariant.weight_unit);
+                    const item = {
+                      slug: editSelectedProduct.slug,
+                      name: editSelectedProduct.name,
+                      variantId: editSelectedVariant.id,
+                      variantLabel: label,
+                      qty,
+                      priceUsd: Number(editSelectedVariant.price_usd ?? 0),
+                      priceFcfa: Number(editSelectedVariant.price_fcfa ?? 0),
+                    };
+                    const existingIndex = editForm.items.findIndex((current: any) => current.variantId === item.variantId);
+                    const nextItems = existingIndex >= 0
+                      ? editForm.items.map((current: any, index: number) => index === existingIndex ? { ...current, qty: current.qty + item.qty } : current)
+                      : [...editForm.items, item];
+                    setEditForm({ ...editForm, items: nextItems });
+                    setEditProduct({ product_id: "", variant_id: "", qty: "" });
+                  }}
+                >
+                  Ajouter
+                </button>
               </div>
-            );
-          })}
+              <div className="mt-4 space-y-2">
+                {editForm.items.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Aucun produit dans la commande.</p>
+                ) : editForm.items.map((item: any) => (
+                  <div key={item.variantId} className="flex items-center justify-between gap-3 rounded-xl bg-card p-3 text-sm">
+                    <div>
+                      <strong>{item.qty} × {item.name}{item.variantLabel ? ` (${item.variantLabel})` : ""}</strong>
+                    </div>
+                    <button type="button" onClick={() => setEditForm({ ...editForm, items: editForm.items.filter((current: any) => current.variantId !== item.variantId) })} className="rounded-full p-2 text-red-600 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {editSummary && (
+                <div className="mt-4 rounded-xl bg-clay p-4 text-sm space-y-2">
+                  <div className="flex justify-between gap-4"><span className="text-muted-foreground">Produits</span><strong>{editSummary.productsLabel}</strong></div>
+                  <div className="flex justify-between gap-4"><span className="text-muted-foreground">Livraison</span><strong>{editFeeLoading ? "Calcul…" : editSummary.deliveryLabel}</strong></div>
+                  <div className="flex justify-between gap-4 border-t border-espresso/10 pt-2"><span className="text-espresso">Total à encaisser</span><strong className="text-copper">{editSummary.collectLabel}</strong></div>
+                </div>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button className="btn-ghost" onClick={() => setEditForm(null)}>Annuler</button>
+              <button
+                className="btn-hero"
+                disabled={updateMut.isPending || editForm.items.length === 0 || !editForm.commune || !editForm.city || !editForm.customer_name.trim() || (editNeedsZone && !editForm.delivery_zone)}
+                onClick={() => {
+                  const country = findCountry(editForm.country_code)!;
+                  updateMut.mutate({
+                    order_id: editForm.id,
+                    customer_name: editForm.customer_name,
+                    customer_phone: editForm.customer_phone,
+                    country_code: editForm.country_code,
+                    country_name: country.name,
+                    city: editForm.city,
+                    commune: editForm.commune,
+                    delivery_zone: editForm.delivery_zone,
+                    address: editForm.address,
+                    delivery_date: editForm.delivery_date || null,
+                    delivery_time: editForm.delivery_time || null,
+                    notes: editForm.notes || null,
+                    assigned_to: editForm.assigned_to || null,
+                    items: editForm.items,
+                    total_usd: editTotals.usd,
+                    total_fcfa: editTotals.fcfa,
+                    delivery_fee_fcfa: editDeliveryFee,
+                    delivery_fee_usd: 0,
+                  });
+                }}
+              >
+                {updateMut.isPending ? "Enregistrement…" : "Enregistrer les modifications"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </StaffShell>

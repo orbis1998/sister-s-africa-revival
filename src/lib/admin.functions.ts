@@ -370,7 +370,8 @@ export const adminUpsertPOS = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
     id?: string; name: string; city?: string; city_scope?: StaffDirection | "";
-    address?: string; phone?: string; public_note?: string; manager_user_id?: string | null;
+    address?: string; phone?: string; public_note?: string; public_listing?: string;
+    manager_user_id?: string | null;
     manager_user_ids?: string[];
   }) => d)
   .handler(async ({ data, context }) => {
@@ -395,6 +396,7 @@ export const adminUpsertPOS = createServerFn({ method: "POST" })
         address: posPayload.address,
         phone: posPayload.phone,
         public_note: posPayload.public_note ?? null,
+        public_listing: posPayload.public_listing ?? "retail",
         manager_user_id: primaryManagerId,
       }).select("id").single();
       if (error) throw new Error(error.message);
@@ -573,6 +575,13 @@ export const adminUpdateSiteSettings = createServerFn({ method: "POST" })
     pos_page_cta_label?: string;
     pos_page_cta_href?: string;
     pos_page_cta_secondary_label?: string;
+    expedition_page_eyebrow?: string;
+    expedition_page_title?: string;
+    expedition_page_cta_label?: string;
+    expedition_page_cta_href?: string;
+    expedition_page_cta_secondary_label?: string;
+    contact_page_eyebrow?: string;
+    contact_page_title?: string;
     story_eyebrow?: string;
     story_title?: string;
     story_paragraph_1?: string;

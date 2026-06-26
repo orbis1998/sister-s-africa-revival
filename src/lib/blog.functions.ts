@@ -14,6 +14,7 @@ export type BlogPost = {
   is_published: boolean;
   seo_title: string | null;
   seo_description: string | null;
+  public_page: "points_de_vente" | "expedition" | "both";
   created_at: string;
   updated_at: string;
 };
@@ -71,6 +72,7 @@ export const adminUpsertBlogPost = createServerFn({ method: "POST" })
     read_time?: string;
     sort_order?: number;
     is_published?: boolean;
+    public_page?: "points_de_vente" | "expedition" | "both";
     seo_title?: string;
     seo_description?: string;
   }) => d)

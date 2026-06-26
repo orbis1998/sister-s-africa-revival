@@ -229,3 +229,85 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+export const updateStaffOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    order_id: string;
+    customer_name: string;
+    customer_phone: string;
+    country_code: string;
+    country_name: string;
+    city: string;
+    commune: string;
+    address: string;
+    delivery_zone?: string;
+    delivery_date?: string | null;
+    delivery_time?: string | null;
+    notes?: string | null;
+    assigned_to?: string | null;
+    items: Array<{ slug?: string; name: string; variantId?: string; variantLabel?: string; qty: number; priceUsd?: number; priceFcfa?: number }>;
+    total_fcfa: number;
+    total_usd: number;
+    delivery_fee_fcfa?: number;
+    delivery_fee_usd?: number;
+  }) => d)
+  .handler(async ({ data, context }) => {
+    const ctx = context as any;
+    const roles = await getRoles(ctx);
+    if (!roles.some((r: string) => ["admin", "manager"].includes(r))) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await ensureManagerOrderAccess(supabaseAdmin, roles, ctx.userId);
+
+    const { data: existing, error: fetchErr } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .eq("id", data.order_id)
+      .maybeSingle();
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!existing) throw new Error("Commande introuvable");
+    if (["delivered", "cancelled"].includes(existing.status)) {
+      throw new Error("Impossible de modifier une commande livrée ou annulée");
+    }
+
+    const city_scope = directionFromCity(data.city, data.country_code);
+    if (!roles.includes("admin")) {
+      const scope = await getProfileScope(supabaseAdmin, ctx.userId);
+      if (!scope || existing.city_scope !== scope || city_scope !== scope) {
+        throw new Error("Forbidden: commande hors direction");
+      }
+      if (data.assigned_to) {
+        const { data: driver } = await supabaseAdmin.from("profiles").select("city_scope").eq("id", data.assigned_to).maybeSingle();
+        if (driver?.city_scope !== scope) throw new Error("Forbidden: livreur hors direction");
+      }
+    }
+
+    const pos_id = await resolvePosForOrder(supabaseAdmin, city_scope, ctx.userId);
+    if (!data.items?.length) throw new Error("Ajoutez au moins un produit");
+    await assertOrderStockAvailable(supabaseAdmin, pos_id, data.items);
+
+    const { error } = await supabaseAdmin.from("orders").update({
+      customer_name: data.customer_name,
+      customer_phone: data.customer_phone,
+      country_code: data.country_code,
+      country_name: data.country_name,
+      city: data.city,
+      city_scope,
+      pos_id,
+      commune: data.commune,
+      delivery_zone: data.delivery_zone ?? "",
+      address: data.address,
+      delivery_date: data.delivery_date ?? null,
+      delivery_time: data.delivery_time ?? null,
+      notes: data.notes ?? null,
+      assigned_to: data.assigned_to || null,
+      items: data.items,
+      total_fcfa: data.total_fcfa,
+      total_usd: data.total_usd,
+      delivery_fee_fcfa: data.delivery_fee_fcfa ?? 0,
+      delivery_fee_usd: data.delivery_fee_usd ?? 0,
+      updated_at: new Date().toISOString(),
+    }).eq("id", data.order_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

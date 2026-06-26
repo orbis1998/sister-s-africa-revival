@@ -45,7 +45,7 @@ function ManagerDashboard() {
     product_id: "",
     variant_id: "",
     product_name: "",
-    quantity: "1",
+    quantity: "",
     unit_price_usd: "",
     unit_price_fcfa: "",
     payment_status: "pending",
@@ -187,7 +187,8 @@ function ManagerDashboard() {
   const wholesaleMut = useMutation({
     mutationFn: () => {
       const selected = products.find((p: any) => p.id === wholesale.product_id);
-      const qty = Number.parseInt(wholesale.quantity || "1", 10);
+      const qty = Number.parseInt(wholesale.quantity, 10);
+      if (!qty || qty < 1) throw new Error("Indiquez une quantité valide");
       if (!activePosId) throw new Error("Aucun point de vente assigné — contactez l'administrateur");
       if (!selected?.name && !wholesale.product_name.trim()) throw new Error("Produit requis");
       return createWholesale({
@@ -198,7 +199,7 @@ function ManagerDashboard() {
           product_id: wholesale.product_id || null,
           variant_id: selectedVariant?.id || null,
           product_name: selected?.name ?? wholesale.product_name.trim(),
-          quantity: Number.isNaN(qty) ? 1 : Math.max(1, qty),
+          quantity: qty,
           unit_price_usd: Number(wholesale.unit_price_usd || 0),
           unit_price_fcfa: Number.parseInt(wholesale.unit_price_fcfa || "0", 10) || 0,
           payment_status: wholesale.payment_status,
@@ -215,7 +216,7 @@ function ManagerDashboard() {
         product_id: "",
         variant_id: "",
         product_name: "",
-        quantity: "1",
+        quantity: "",
         unit_price_usd: "",
         unit_price_fcfa: "",
         payment_status: "pending",
@@ -414,7 +415,15 @@ function ManagerDashboard() {
               </select>
             )}
             <div className="grid grid-cols-2 gap-3">
-              <input type="number" min={1} placeholder="Qté" value={wholesale.quantity} onChange={(e) => setWholesale({ ...wholesale, quantity: e.target.value })} className="input-admin" />
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Qté"
+                value={wholesale.quantity}
+                onChange={(e) => setWholesale({ ...wholesale, quantity: e.target.value.replace(/\D/g, "") })}
+                className="input-admin input-qty"
+              />
               {priceCurrency === "FCFA" ? (
                 <input type="number" min={0} placeholder="Prix unitaire FCFA" value={wholesale.unit_price_fcfa} onChange={(e) => setWholesale({ ...wholesale, unit_price_fcfa: e.target.value, unit_price_usd: "" })} className="input-admin" />
               ) : (

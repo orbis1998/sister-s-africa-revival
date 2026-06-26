@@ -118,30 +118,6 @@ function SettingsPage() {
         </div>
       </div>
 
-      <div className="mt-8 rounded-2xl border border-border bg-card p-6">
-        <h2 className="font-display text-2xl">Page points de vente</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Texte d'introduction en haut de la page /blog. Les fiches de chaque point de vente se gèrent dans Points de vente.
-        </p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <Field label="Surtitre">
-            <input value={form.pos_page_eyebrow ?? ""} onChange={(e) => setForm({ ...form, pos_page_eyebrow: e.target.value })} className="input-admin" />
-          </Field>
-          <Field label="Titre principal" className="sm:col-span-2">
-            <input value={form.pos_page_title ?? ""} onChange={(e) => setForm({ ...form, pos_page_title: e.target.value })} className="input-admin" />
-          </Field>
-          <Field label="Label bouton principal">
-            <input value={form.pos_page_cta_label ?? ""} onChange={(e) => setForm({ ...form, pos_page_cta_label: e.target.value })} className="input-admin" />
-          </Field>
-          <Field label="Lien bouton principal">
-            <input value={form.pos_page_cta_href ?? ""} onChange={(e) => setForm({ ...form, pos_page_cta_href: e.target.value })} className="input-admin" />
-          </Field>
-          <Field label="Label bouton WhatsApp" className="sm:col-span-2">
-            <input value={form.pos_page_cta_secondary_label ?? ""} onChange={(e) => setForm({ ...form, pos_page_cta_secondary_label: e.target.value })} className="input-admin" />
-          </Field>
-        </div>
-      </div>
-
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-border bg-card p-6">
           <h2 className="font-display text-2xl">Notre histoire (accueil)</h2>

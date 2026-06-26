@@ -8,7 +8,9 @@ import logo from "@/assets/logo.png";
 const nav = [
   { to: "/", label: "Accueil" },
   { to: "/products", label: "Produits" },
+  { to: "/expedition", label: "Expédition" },
   { to: "/blog", label: "Points de vente" },
+  { to: "/contact", label: "Contact" },
 ];
 
 export function Header() {

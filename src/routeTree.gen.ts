@@ -13,6 +13,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ExpeditionRouteImport } from './routes/expedition'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CartRouteImport } from './routes/cart'
@@ -39,6 +40,8 @@ import { Route as AuthenticatedAdminReviewsRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminProductsRouteImport } from './routes/_authenticated/admin.products'
 import { Route as AuthenticatedAdminPosRouteImport } from './routes/_authenticated/admin.pos'
 import { Route as AuthenticatedAdminLogisticsRouteImport } from './routes/_authenticated/admin.logistics'
+import { Route as AuthenticatedAdminExpeditionPageRouteImport } from './routes/_authenticated/admin.expedition-page'
+import { Route as AuthenticatedAdminContactPageRouteImport } from './routes/_authenticated/admin.contact-page'
 import { Route as AuthenticatedAdminBlogRouteImport } from './routes/_authenticated/admin.blog'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -59,6 +62,11 @@ const ProductsRoute = ProductsRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExpeditionRoute = ExpeditionRouteImport.update({
+  id: '/expedition',
+  path: '/expedition',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactRoute = ContactRouteImport.update({
@@ -197,6 +205,18 @@ const AuthenticatedAdminLogisticsRoute =
     path: '/logistics',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminExpeditionPageRoute =
+  AuthenticatedAdminExpeditionPageRouteImport.update({
+    id: '/expedition-page',
+    path: '/expedition-page',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminContactPageRoute =
+  AuthenticatedAdminContactPageRouteImport.update({
+    id: '/contact-page',
+    path: '/contact-page',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminBlogRoute = AuthenticatedAdminBlogRouteImport.update({
   id: '/blog',
   path: '/blog',
@@ -210,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
+  '/expedition': typeof ExpeditionRoute
   '/login': typeof LoginRouteWithChildren
   '/products': typeof ProductsRoute
   '/signup': typeof SignupRoute
@@ -223,6 +244,8 @@ export interface FileRoutesByFullPath {
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
   '/admin/blog': typeof AuthenticatedAdminBlogRoute
+  '/admin/contact-page': typeof AuthenticatedAdminContactPageRoute
+  '/admin/expedition-page': typeof AuthenticatedAdminExpeditionPageRoute
   '/admin/logistics': typeof AuthenticatedAdminLogisticsRoute
   '/admin/pos': typeof AuthenticatedAdminPosRoute
   '/admin/products': typeof AuthenticatedAdminProductsRoute
@@ -242,6 +265,7 @@ export interface FileRoutesByTo {
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
+  '/expedition': typeof ExpeditionRoute
   '/login': typeof LoginRouteWithChildren
   '/products': typeof ProductsRoute
   '/signup': typeof SignupRoute
@@ -253,6 +277,8 @@ export interface FileRoutesByTo {
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
   '/admin/blog': typeof AuthenticatedAdminBlogRoute
+  '/admin/contact-page': typeof AuthenticatedAdminContactPageRoute
+  '/admin/expedition-page': typeof AuthenticatedAdminExpeditionPageRoute
   '/admin/logistics': typeof AuthenticatedAdminLogisticsRoute
   '/admin/pos': typeof AuthenticatedAdminPosRoute
   '/admin/products': typeof AuthenticatedAdminProductsRoute
@@ -274,6 +300,7 @@ export interface FileRoutesById {
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
+  '/expedition': typeof ExpeditionRoute
   '/login': typeof LoginRouteWithChildren
   '/products': typeof ProductsRoute
   '/signup': typeof SignupRoute
@@ -287,6 +314,8 @@ export interface FileRoutesById {
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
   '/_authenticated/admin/blog': typeof AuthenticatedAdminBlogRoute
+  '/_authenticated/admin/contact-page': typeof AuthenticatedAdminContactPageRoute
+  '/_authenticated/admin/expedition-page': typeof AuthenticatedAdminExpeditionPageRoute
   '/_authenticated/admin/logistics': typeof AuthenticatedAdminLogisticsRoute
   '/_authenticated/admin/pos': typeof AuthenticatedAdminPosRoute
   '/_authenticated/admin/products': typeof AuthenticatedAdminProductsRoute
@@ -308,6 +337,7 @@ export interface FileRouteTypes {
     | '/cart'
     | '/checkout'
     | '/contact'
+    | '/expedition'
     | '/login'
     | '/products'
     | '/signup'
@@ -321,6 +351,8 @@ export interface FileRouteTypes {
     | '/login/$role'
     | '/product/$slug'
     | '/admin/blog'
+    | '/admin/contact-page'
+    | '/admin/expedition-page'
     | '/admin/logistics'
     | '/admin/pos'
     | '/admin/products'
@@ -340,6 +372,7 @@ export interface FileRouteTypes {
     | '/cart'
     | '/checkout'
     | '/contact'
+    | '/expedition'
     | '/login'
     | '/products'
     | '/signup'
@@ -351,6 +384,8 @@ export interface FileRouteTypes {
     | '/login/$role'
     | '/product/$slug'
     | '/admin/blog'
+    | '/admin/contact-page'
+    | '/admin/expedition-page'
     | '/admin/logistics'
     | '/admin/pos'
     | '/admin/products'
@@ -371,6 +406,7 @@ export interface FileRouteTypes {
     | '/cart'
     | '/checkout'
     | '/contact'
+    | '/expedition'
     | '/login'
     | '/products'
     | '/signup'
@@ -384,6 +420,8 @@ export interface FileRouteTypes {
     | '/login/$role'
     | '/product/$slug'
     | '/_authenticated/admin/blog'
+    | '/_authenticated/admin/contact-page'
+    | '/_authenticated/admin/expedition-page'
     | '/_authenticated/admin/logistics'
     | '/_authenticated/admin/pos'
     | '/_authenticated/admin/products'
@@ -405,6 +443,7 @@ export interface RootRouteChildren {
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
   ContactRoute: typeof ContactRoute
+  ExpeditionRoute: typeof ExpeditionRoute
   LoginRoute: typeof LoginRouteWithChildren
   ProductsRoute: typeof ProductsRoute
   SignupRoute: typeof SignupRoute
@@ -441,6 +480,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/expedition': {
+      id: '/expedition'
+      path: '/expedition'
+      fullPath: '/expedition'
+      preLoaderRoute: typeof ExpeditionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -625,6 +671,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminLogisticsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/expedition-page': {
+      id: '/_authenticated/admin/expedition-page'
+      path: '/expedition-page'
+      fullPath: '/admin/expedition-page'
+      preLoaderRoute: typeof AuthenticatedAdminExpeditionPageRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/contact-page': {
+      id: '/_authenticated/admin/contact-page'
+      path: '/contact-page'
+      fullPath: '/admin/contact-page'
+      preLoaderRoute: typeof AuthenticatedAdminContactPageRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/blog': {
       id: '/_authenticated/admin/blog'
       path: '/blog'
@@ -637,6 +697,8 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminBlogRoute: typeof AuthenticatedAdminBlogRoute
+  AuthenticatedAdminContactPageRoute: typeof AuthenticatedAdminContactPageRoute
+  AuthenticatedAdminExpeditionPageRoute: typeof AuthenticatedAdminExpeditionPageRoute
   AuthenticatedAdminLogisticsRoute: typeof AuthenticatedAdminLogisticsRoute
   AuthenticatedAdminPosRoute: typeof AuthenticatedAdminPosRoute
   AuthenticatedAdminProductsRoute: typeof AuthenticatedAdminProductsRoute
@@ -650,6 +712,8 @@ interface AuthenticatedAdminRouteChildren {
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminBlogRoute: AuthenticatedAdminBlogRoute,
+  AuthenticatedAdminContactPageRoute: AuthenticatedAdminContactPageRoute,
+  AuthenticatedAdminExpeditionPageRoute: AuthenticatedAdminExpeditionPageRoute,
   AuthenticatedAdminLogisticsRoute: AuthenticatedAdminLogisticsRoute,
   AuthenticatedAdminPosRoute: AuthenticatedAdminPosRoute,
   AuthenticatedAdminProductsRoute: AuthenticatedAdminProductsRoute,
@@ -714,6 +778,7 @@ const rootRouteChildren: RootRouteChildren = {
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
   ContactRoute: ContactRoute,
+  ExpeditionRoute: ExpeditionRoute,
   LoginRoute: LoginRouteWithChildren,
   ProductsRoute: ProductsRoute,
   SignupRoute: SignupRoute,

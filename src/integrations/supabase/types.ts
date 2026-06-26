@@ -71,6 +71,7 @@ export type Database = {
           excerpt: string | null
           id: string
           is_published: boolean
+          public_page: string
           read_time: string | null
           seo_description: string | null
           seo_title: string | null
@@ -88,6 +89,7 @@ export type Database = {
           excerpt?: string | null
           id?: string
           is_published?: boolean
+          public_page?: string
           read_time?: string | null
           seo_description?: string | null
           seo_title?: string | null
@@ -105,6 +107,7 @@ export type Database = {
           excerpt?: string | null
           id?: string
           is_published?: boolean
+          public_page?: string
           read_time?: string | null
           seo_description?: string | null
           seo_title?: string | null
@@ -339,6 +342,7 @@ export type Database = {
           manager_user_id: string | null
           name: string
           phone: string | null
+          public_listing: string
           public_note: string | null
         }
         Insert: {
@@ -350,6 +354,7 @@ export type Database = {
           manager_user_id?: string | null
           name: string
           phone?: string | null
+          public_listing?: string
           public_note?: string | null
         }
         Update: {
@@ -361,6 +366,7 @@ export type Database = {
           manager_user_id?: string | null
           name?: string
           phone?: string | null
+          public_listing?: string
           public_note?: string | null
         }
         Relationships: []
@@ -600,8 +606,15 @@ export type Database = {
       }
       site_settings: {
         Row: {
+          contact_page_eyebrow: string
+          contact_page_title: string
           cta_href: string
           cta_label: string
+          expedition_page_cta_href: string
+          expedition_page_cta_label: string
+          expedition_page_cta_secondary_label: string
+          expedition_page_eyebrow: string
+          expedition_page_title: string
           hero_eyebrow: string
           hero_highlight: string
           hero_images: string[]
@@ -629,8 +642,15 @@ export type Database = {
           whatsapp_number: string
         }
         Insert: {
+          contact_page_eyebrow?: string
+          contact_page_title?: string
           cta_href?: string
           cta_label?: string
+          expedition_page_cta_href?: string
+          expedition_page_cta_label?: string
+          expedition_page_cta_secondary_label?: string
+          expedition_page_eyebrow?: string
+          expedition_page_title?: string
           hero_eyebrow?: string
           hero_highlight?: string
           hero_images?: string[]
@@ -658,8 +678,15 @@ export type Database = {
           whatsapp_number?: string
         }
         Update: {
+          contact_page_eyebrow?: string
+          contact_page_title?: string
           cta_href?: string
           cta_label?: string
+          expedition_page_cta_href?: string
+          expedition_page_cta_label?: string
+          expedition_page_cta_secondary_label?: string
+          expedition_page_eyebrow?: string
+          expedition_page_title?: string
           hero_eyebrow?: string
           hero_highlight?: string
           hero_images?: string[]

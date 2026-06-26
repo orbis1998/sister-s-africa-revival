@@ -72,7 +72,7 @@ function POSPage() {
   function openForm(pos?: any) {
     setExpandedSaleId(null);
     if (!pos) {
-      setForm({ name: "", city: "", city_scope: "kinshasa", address: "", phone: "", public_note: "", manager_user_ids: [], _managersLoaded: true });
+      setForm({ name: "", city: "", city_scope: "kinshasa", address: "", phone: "", public_note: "", public_listing: "retail", manager_user_ids: [], _managersLoaded: true });
       return;
     }
     setForm({ ...pos, manager_user_ids: [], _managersLoaded: false });
@@ -83,7 +83,7 @@ function POSPage() {
       <div className="flex justify-between items-end">
         <div>
           <span className="eyebrow">Distribution</span>
-          <h1 className="font-display text-4xl mt-2">Points de vente</h1>
+          <h1 className="font-display text-4xl mt-2">Magasins POS</h1>
           <p className="mt-2 text-sm text-muted-foreground max-w-xl">
             Associez plusieurs managers POS de la même direction — ils partagent le stock et peuvent vendre en présentiel sur ce point de vente.
           </p>
@@ -121,12 +121,21 @@ function POSPage() {
               <input placeholder="Adresse" value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input-admin" />
               <input placeholder="Téléphone" value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input-admin" />
               <textarea
-                placeholder="Note publique (affichée sur la page points de vente)"
+                placeholder="Note publique (affichée sur le site)"
                 value={form.public_note ?? ""}
                 onChange={(e) => setForm({ ...form, public_note: e.target.value })}
                 rows={3}
                 className="input-admin resize-none"
               />
+              <select
+                value={form.public_listing ?? "retail"}
+                onChange={(e) => setForm({ ...form, public_listing: e.target.value })}
+                className="input-admin"
+              >
+                <option value="retail">Page points de vente</option>
+                <option value="expedition">Page expédition</option>
+                <option value="contact">Page contact</option>
+              </select>
               <div className="rounded-xl border border-border bg-cream/40 p-4">
                 <label className="mb-2 block text-[10px] uppercase tracking-widest text-muted-foreground">
                   Managers responsables (permission POS · même direction)
@@ -238,6 +247,8 @@ function POSPage() {
                   city_scope: form.city_scope,
                   address: form.address,
                   phone: form.phone,
+                  public_note: form.public_note,
+                  public_listing: form.public_listing ?? "retail",
                   manager_user_ids: form.manager_user_ids ?? [],
                 })}
               >

@@ -5,35 +5,35 @@ import { fetchPublicPointsOfSale } from "@/lib/public-pos";
 import { buildSeoMeta } from "@/lib/seo";
 import { defaultSiteSettings, fetchSiteSettings } from "@/lib/site-settings";
 
-export const Route = createFileRoute("/blog")({
+export const Route = createFileRoute("/expedition")({
   head: () => buildSeoMeta({
-    title: "Points de vente & conseils — The Sisters Africa",
-    description: "Retrouvez nos points de vente partenaires et nos guides pour comprendre les bouillies bio The Sisters Africa.",
-    url: "https://thesistersafrica.com/blog",
+    title: "Expédition — The Sisters Africa",
+    description: "Découvrez nos zones d'expédition et nos guides pour commander The Sisters Africa partout en Afrique centrale.",
+    url: "https://thesistersafrica.com/expedition",
     type: "website",
   }),
   loader: async () => {
     const [posts, settings, pointsOfSale] = await Promise.all([
-      fetchPublishedBlogPosts("points_de_vente"),
+      fetchPublishedBlogPosts("expedition"),
       fetchSiteSettings().catch(() => defaultSiteSettings),
-      fetchPublicPointsOfSale("retail").catch(() => []),
+      fetchPublicPointsOfSale("expedition").catch(() => []),
     ]);
     return { posts, settings, pointsOfSale };
   },
-  component: BlogPage,
+  component: ExpeditionPage,
 });
 
-function BlogPage() {
+function ExpeditionPage() {
   const { posts, settings, pointsOfSale } = Route.useLoaderData();
 
   return (
     <CmsPublicPage
       hero={{
-        eyebrow: settings.pos_page_eyebrow,
-        title: settings.pos_page_title,
-        ctaLabel: settings.pos_page_cta_label,
-        ctaHref: settings.pos_page_cta_href,
-        ctaSecondaryLabel: settings.pos_page_cta_secondary_label,
+        eyebrow: settings.expedition_page_eyebrow,
+        title: settings.expedition_page_title,
+        ctaLabel: settings.expedition_page_cta_label,
+        ctaHref: settings.expedition_page_cta_href,
+        ctaSecondaryLabel: settings.expedition_page_cta_secondary_label,
         whatsappNumber: settings.whatsapp_number,
       }}
       pointsOfSale={pointsOfSale}
