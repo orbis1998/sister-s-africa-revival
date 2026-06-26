@@ -103,7 +103,7 @@ function LogisticsPage() {
   const [manualOpen, setManualOpen] = useState(false);
   const minDeliveryDate = tomorrowInputDate();
   const [manual, setManual] = useState<any>(() => emptyManualOrder(minDeliveryDate));
-  const [manualProduct, setManualProduct] = useState({ product_id: "", variant_id: "", qty: 1 });
+  const [manualProduct, setManualProduct] = useState({ product_id: "", variant_id: "", qty: "" });
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [feeLoading, setFeeLoading] = useState(false);
 
@@ -207,7 +207,7 @@ function LogisticsPage() {
       toast.success("Commande créée");
       setManualOpen(false);
       setManual(emptyManualOrder(minDeliveryDate));
-      setManualProduct({ product_id: "", variant_id: "", qty: 1 });
+      setManualProduct({ product_id: "", variant_id: "", qty: "" });
       setDeliveryFee(0);
       qc.invalidateQueries({ queryKey: ["orders"] });
     },
@@ -323,18 +323,31 @@ function LogisticsPage() {
                   })}
                 </select>
               )}
-              <input type="number" min={1} max={Math.max(1, selectedRemaining || 1)} value={manualProduct.qty} onChange={(e) => setManualProduct({ ...manualProduct, qty: Number.parseInt(e.target.value || "1", 10) })} className="input-admin" />
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Qté"
+                value={manualProduct.qty}
+                onChange={(e) => setManualProduct({ ...manualProduct, qty: e.target.value.replace(/\D/g, "") })}
+                className="input-admin"
+              />
               <button
                 type="button"
                 className="rounded bg-espresso px-4 py-2 text-xs font-medium uppercase tracking-widest text-cream disabled:opacity-50"
-                disabled={!selectedProduct || !selectedVariant || selectedRemaining <= 0}
+                disabled={!selectedProduct || !selectedVariant || selectedRemaining <= 0 || !manualProduct.qty}
                 onClick={() => {
                   if (!selectedProduct || !selectedVariant) return;
                   if (selectedRemaining <= 0) {
                     toast.error(`${selectedProduct.name} — fini en stock`);
                     return;
                   }
-                  const qty = Math.max(1, Math.min(selectedRemaining, manualProduct.qty || 1));
+                  const parsedQty = Number.parseInt(manualProduct.qty, 10);
+                  if (!parsedQty || parsedQty < 1) {
+                    toast.error("Indiquez une quantité valide");
+                    return;
+                  }
+                  const qty = Math.min(selectedRemaining, parsedQty);
                   const label = formatVariantLabel(Number(selectedVariant.weight_value), selectedVariant.weight_unit);
                   const item = {
                     slug: selectedProduct.slug,
@@ -350,7 +363,7 @@ function LogisticsPage() {
                     ? manual.items.map((current: any, index: number) => index === existingIndex ? { ...current, qty: current.qty + item.qty } : current)
                     : [...manual.items, item];
                   setManual({ ...manual, items: nextItems });
-                  setManualProduct({ product_id: "", variant_id: "", qty: 1 });
+                  setManualProduct({ product_id: "", variant_id: "", qty: "" });
                 }}
               >
                 Ajouter

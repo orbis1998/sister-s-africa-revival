@@ -17,13 +17,12 @@ import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as BlogRouteRouteImport } from './routes/blog/route'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as BlogIndexRouteImport } from './routes/blog/index'
+import { Route as BlogIndexRouteImport } from './routes/blog.index'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as LoginRoleRouteImport } from './routes/login.$role'
-import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
+import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
 import { Route as AuthenticatedManagerRouteImport } from './routes/_authenticated/manager'
 import { Route as AuthenticatedLivreurRouteImport } from './routes/_authenticated/livreur'
@@ -82,11 +81,6 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BlogRouteRoute = BlogRouteRouteImport.update({
-  id: '/blog',
-  path: '/blog',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -97,9 +91,9 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const BlogIndexRoute = BlogIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => BlogRouteRoute,
+  id: '/blog/',
+  path: '/blog/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ProductSlugRoute = ProductSlugRouteImport.update({
   id: '/product/$slug',
@@ -112,9 +106,9 @@ const LoginRoleRoute = LoginRoleRouteImport.update({
   getParentRoute: () => LoginRoute,
 } as any)
 const BlogSlugRoute = BlogSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => BlogRouteRoute,
+  id: '/blog/$slug',
+  path: '/blog/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedPosRoute = AuthenticatedPosRouteImport.update({
   id: '/pos',
@@ -211,7 +205,6 @@ const AuthenticatedAdminBlogRoute = AuthenticatedAdminBlogRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/blog': typeof BlogRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
@@ -276,7 +269,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/blog': typeof BlogRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
@@ -311,7 +303,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/blog'
     | '/auth'
     | '/cart'
     | '/checkout'
@@ -375,7 +366,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
-    | '/blog'
     | '/auth'
     | '/cart'
     | '/checkout'
@@ -410,7 +400,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  BlogRouteRoute: typeof BlogRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
@@ -419,7 +408,9 @@ export interface RootRouteChildren {
   ProductsRoute: typeof ProductsRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  BlogSlugRoute: typeof BlogSlugRoute
   ProductSlugRoute: typeof ProductSlugRoute
+  BlogIndexRoute: typeof BlogIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -480,13 +471,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/blog': {
-      id: '/blog'
-      path: '/blog'
-      fullPath: '/blog'
-      preLoaderRoute: typeof BlogRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -503,10 +487,10 @@ declare module '@tanstack/react-router' {
     }
     '/blog/': {
       id: '/blog/'
-      path: '/'
+      path: '/blog'
       fullPath: '/blog/'
       preLoaderRoute: typeof BlogIndexRouteImport
-      parentRoute: typeof BlogRouteRoute
+      parentRoute: typeof rootRouteImport
     }
     '/product/$slug': {
       id: '/product/$slug'
@@ -524,10 +508,10 @@ declare module '@tanstack/react-router' {
     }
     '/blog/$slug': {
       id: '/blog/$slug'
-      path: '/$slug'
+      path: '/blog/$slug'
       fullPath: '/blog/$slug'
       preLoaderRoute: typeof BlogSlugRouteImport
-      parentRoute: typeof BlogRouteRoute
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/pos': {
       id: '/_authenticated/pos'
@@ -712,20 +696,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
-interface BlogRouteRouteChildren {
-  BlogSlugRoute: typeof BlogSlugRoute
-  BlogIndexRoute: typeof BlogIndexRoute
-}
-
-const BlogRouteRouteChildren: BlogRouteRouteChildren = {
-  BlogSlugRoute: BlogSlugRoute,
-  BlogIndexRoute: BlogIndexRoute,
-}
-
-const BlogRouteRouteWithChildren = BlogRouteRoute._addFileChildren(
-  BlogRouteRouteChildren,
-)
-
 interface LoginRouteChildren {
   LoginRoleRoute: typeof LoginRoleRoute
 }
@@ -739,7 +709,6 @@ const LoginRouteWithChildren = LoginRoute._addFileChildren(LoginRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
-  BlogRouteRoute: BlogRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
@@ -748,7 +717,9 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsRoute: ProductsRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  BlogSlugRoute: BlogSlugRoute,
   ProductSlugRoute: ProductSlugRoute,
+  BlogIndexRoute: BlogIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

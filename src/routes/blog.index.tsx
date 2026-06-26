@@ -23,6 +23,10 @@ export const Route = createFileRoute("/blog/")({
   component: BlogPage,
 });
 
+function blogArticleHref(slug: string) {
+  return `/blog/${encodeURIComponent(slug)}`;
+}
+
 function BlogPage() {
   const { posts, settings, pointsOfSale } = Route.useLoaderData();
   const whatsappHref = `https://wa.me/${settings.whatsapp_number.replace(/\D/g, "")}`;
@@ -74,16 +78,13 @@ function BlogPage() {
       <section className="relative z-10 container-page py-20 md:py-24">
         <div className="grid gap-6 lg:grid-cols-2">
           {posts.map((article, index) => (
-            <article
+            <a
               key={article.id}
-              className="group overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-elegant"
+              href={blogArticleHref(article.slug)}
+              className="group block overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-elegant"
             >
               <div className="grid min-h-full sm:grid-cols-[0.38fr_0.62fr]">
-                <Link
-                  to="/blog/$slug"
-                  params={{ slug: article.slug }}
-                  className="relative flex min-h-56 flex-col justify-between bg-espresso p-7 text-cream"
-                >
+                <div className="relative flex min-h-56 flex-col justify-between bg-espresso p-7 text-cream">
                   {article.cover_image_url ? (
                     <img src={article.cover_image_url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />
                   ) : (
@@ -91,27 +92,19 @@ function BlogPage() {
                   )}
                   <div className="relative text-xs uppercase tracking-[0.22em] text-gold">{article.category}</div>
                   <div className="relative font-display text-7xl text-cream/90">{String(index + 1).padStart(2, "0")}</div>
-                </Link>
+                </div>
                 <div className="flex flex-col p-7">
                   <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{article.read_time}</div>
-                  <Link
-                    to="/blog/$slug"
-                    params={{ slug: article.slug }}
-                    className="mt-3 font-display text-3xl text-espresso transition group-hover:text-copper"
-                  >
+                  <h2 className="mt-3 font-display text-3xl text-espresso transition group-hover:text-copper">
                     {article.title}
-                  </Link>
+                  </h2>
                   <p className="mt-4 flex-1 text-sm leading-relaxed text-espresso/75">{article.excerpt}</p>
-                  <Link
-                    to="/blog/$slug"
-                    params={{ slug: article.slug }}
-                    className="mt-5 inline-flex w-fit cursor-pointer items-center gap-2 rounded-full border border-copper/30 px-4 py-2 text-xs uppercase tracking-[0.18em] text-copper transition hover:bg-copper hover:text-cream"
-                  >
+                  <span className="mt-5 inline-flex w-fit items-center gap-2 rounded-full border border-copper/30 px-4 py-2 text-xs uppercase tracking-[0.18em] text-copper transition group-hover:bg-copper group-hover:text-cream">
                     En savoir plus <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </article>
+            </a>
           ))}
         </div>
       </section>
