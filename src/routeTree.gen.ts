@@ -16,13 +16,14 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CartRouteImport } from './routes/cart'
+import { Route as BlogRouteImport } from './routes/blog'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as BlogIndexRouteImport } from './routes/blog.index'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as LoginRoleRouteImport } from './routes/login.$role'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
+import { Route as ArticleSlugRouteImport } from './routes/article.$slug'
 import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
 import { Route as AuthenticatedManagerRouteImport } from './routes/_authenticated/manager'
 import { Route as AuthenticatedLivreurRouteImport } from './routes/_authenticated/livreur'
@@ -76,6 +77,11 @@ const CartRoute = CartRouteImport.update({
   path: '/cart',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlogRoute = BlogRouteImport.update({
+  id: '/blog',
+  path: '/blog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -90,11 +96,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BlogIndexRoute = BlogIndexRouteImport.update({
-  id: '/blog/',
-  path: '/blog/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ProductSlugRoute = ProductSlugRouteImport.update({
   id: '/product/$slug',
   path: '/product/$slug',
@@ -106,8 +107,13 @@ const LoginRoleRoute = LoginRoleRouteImport.update({
   getParentRoute: () => LoginRoute,
 } as any)
 const BlogSlugRoute = BlogSlugRouteImport.update({
-  id: '/blog/$slug',
-  path: '/blog/$slug',
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => BlogRoute,
+} as any)
+const ArticleSlugRoute = ArticleSlugRouteImport.update({
+  id: '/article/$slug',
+  path: '/article/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedPosRoute = AuthenticatedPosRouteImport.update({
@@ -206,6 +212,7 @@ const AuthenticatedAdminBlogRoute = AuthenticatedAdminBlogRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/blog': typeof BlogRouteWithChildren
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
@@ -218,10 +225,10 @@ export interface FileRoutesByFullPath {
   '/livreur': typeof AuthenticatedLivreurRoute
   '/manager': typeof AuthenticatedManagerRouteWithChildren
   '/pos': typeof AuthenticatedPosRoute
+  '/article/$slug': typeof ArticleSlugRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
-  '/blog/': typeof BlogIndexRoute
   '/admin/blog': typeof AuthenticatedAdminBlogRoute
   '/admin/logistics': typeof AuthenticatedAdminLogisticsRoute
   '/admin/pos': typeof AuthenticatedAdminPosRoute
@@ -238,6 +245,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/blog': typeof BlogRouteWithChildren
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
@@ -248,10 +256,10 @@ export interface FileRoutesByTo {
   '/account': typeof AuthenticatedAccountRoute
   '/livreur': typeof AuthenticatedLivreurRoute
   '/pos': typeof AuthenticatedPosRoute
+  '/article/$slug': typeof ArticleSlugRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
-  '/blog': typeof BlogIndexRoute
   '/admin/blog': typeof AuthenticatedAdminBlogRoute
   '/admin/logistics': typeof AuthenticatedAdminLogisticsRoute
   '/admin/pos': typeof AuthenticatedAdminPosRoute
@@ -270,6 +278,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/blog': typeof BlogRouteWithChildren
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
@@ -282,10 +291,10 @@ export interface FileRoutesById {
   '/_authenticated/livreur': typeof AuthenticatedLivreurRoute
   '/_authenticated/manager': typeof AuthenticatedManagerRouteWithChildren
   '/_authenticated/pos': typeof AuthenticatedPosRoute
+  '/article/$slug': typeof ArticleSlugRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/login/$role': typeof LoginRoleRoute
   '/product/$slug': typeof ProductSlugRoute
-  '/blog/': typeof BlogIndexRoute
   '/_authenticated/admin/blog': typeof AuthenticatedAdminBlogRoute
   '/_authenticated/admin/logistics': typeof AuthenticatedAdminLogisticsRoute
   '/_authenticated/admin/pos': typeof AuthenticatedAdminPosRoute
@@ -304,6 +313,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/blog'
     | '/cart'
     | '/checkout'
     | '/contact'
@@ -316,10 +326,10 @@ export interface FileRouteTypes {
     | '/livreur'
     | '/manager'
     | '/pos'
+    | '/article/$slug'
     | '/blog/$slug'
     | '/login/$role'
     | '/product/$slug'
-    | '/blog/'
     | '/admin/blog'
     | '/admin/logistics'
     | '/admin/pos'
@@ -336,6 +346,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/blog'
     | '/cart'
     | '/checkout'
     | '/contact'
@@ -346,10 +357,10 @@ export interface FileRouteTypes {
     | '/account'
     | '/livreur'
     | '/pos'
+    | '/article/$slug'
     | '/blog/$slug'
     | '/login/$role'
     | '/product/$slug'
-    | '/blog'
     | '/admin/blog'
     | '/admin/logistics'
     | '/admin/pos'
@@ -367,6 +378,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/blog'
     | '/cart'
     | '/checkout'
     | '/contact'
@@ -379,10 +391,10 @@ export interface FileRouteTypes {
     | '/_authenticated/livreur'
     | '/_authenticated/manager'
     | '/_authenticated/pos'
+    | '/article/$slug'
     | '/blog/$slug'
     | '/login/$role'
     | '/product/$slug'
-    | '/blog/'
     | '/_authenticated/admin/blog'
     | '/_authenticated/admin/logistics'
     | '/_authenticated/admin/pos'
@@ -401,6 +413,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  BlogRoute: typeof BlogRouteWithChildren
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
   ContactRoute: typeof ContactRoute
@@ -408,9 +421,8 @@ export interface RootRouteChildren {
   ProductsRoute: typeof ProductsRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
-  BlogSlugRoute: typeof BlogSlugRoute
+  ArticleSlugRoute: typeof ArticleSlugRoute
   ProductSlugRoute: typeof ProductSlugRoute
-  BlogIndexRoute: typeof BlogIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -464,6 +476,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/blog': {
+      id: '/blog'
+      path: '/blog'
+      fullPath: '/blog'
+      preLoaderRoute: typeof BlogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -485,13 +504,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/blog/': {
-      id: '/blog/'
-      path: '/blog'
-      fullPath: '/blog/'
-      preLoaderRoute: typeof BlogIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/product/$slug': {
       id: '/product/$slug'
       path: '/product/$slug'
@@ -508,9 +520,16 @@ declare module '@tanstack/react-router' {
     }
     '/blog/$slug': {
       id: '/blog/$slug'
-      path: '/blog/$slug'
+      path: '/$slug'
       fullPath: '/blog/$slug'
       preLoaderRoute: typeof BlogSlugRouteImport
+      parentRoute: typeof BlogRoute
+    }
+    '/article/$slug': {
+      id: '/article/$slug'
+      path: '/article/$slug'
+      fullPath: '/article/$slug'
+      preLoaderRoute: typeof ArticleSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/pos': {
@@ -696,6 +715,16 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface BlogRouteChildren {
+  BlogSlugRoute: typeof BlogSlugRoute
+}
+
+const BlogRouteChildren: BlogRouteChildren = {
+  BlogSlugRoute: BlogSlugRoute,
+}
+
+const BlogRouteWithChildren = BlogRoute._addFileChildren(BlogRouteChildren)
+
 interface LoginRouteChildren {
   LoginRoleRoute: typeof LoginRoleRoute
 }
@@ -710,6 +739,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  BlogRoute: BlogRouteWithChildren,
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
   ContactRoute: ContactRoute,
@@ -717,9 +747,8 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsRoute: ProductsRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  BlogSlugRoute: BlogSlugRoute,
+  ArticleSlugRoute: ArticleSlugRoute,
   ProductSlugRoute: ProductSlugRoute,
-  BlogIndexRoute: BlogIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

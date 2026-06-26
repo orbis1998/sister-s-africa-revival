@@ -88,7 +88,7 @@ function BlogAdminPage() {
                 <div className="text-xs text-muted-foreground">/{post.slug} · {post.category} · {post.is_published ? "Publié" : "Brouillon"}</div>
               </div>
               <div className="flex gap-2">
-                <Link to="/blog/$slug" params={{ slug: post.slug }} className="btn-ghost text-xs" target="_blank">
+                <Link to="/article/$slug" params={{ slug: post.slug }} className="btn-ghost text-xs" target="_blank">
                   <ExternalLink className="w-3.5 h-3.5" /> Voir
                 </Link>
                 <button className="btn-ghost text-xs" onClick={() => setForm({ ...post, sort_order: String(post.sort_order), coverFile: null })}>
