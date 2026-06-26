@@ -333,26 +333,35 @@ export type Database = {
         Row: {
           address: string | null
           city: string | null
+          city_scope: string | null
           created_at: string
           id: string
+          manager_user_id: string | null
           name: string
           phone: string | null
+          public_note: string | null
         }
         Insert: {
           address?: string | null
           city?: string | null
+          city_scope?: string | null
           created_at?: string
           id?: string
+          manager_user_id?: string | null
           name: string
           phone?: string | null
+          public_note?: string | null
         }
         Update: {
           address?: string | null
           city?: string | null
+          city_scope?: string | null
           created_at?: string
           id?: string
+          manager_user_id?: string | null
           name?: string
           phone?: string | null
+          public_note?: string | null
         }
         Relationships: []
       }
@@ -598,12 +607,22 @@ export type Database = {
           hero_images: string[]
           hero_subtitle: string
           hero_title: string
+          home_stats: Json
           id: boolean
           og_image_url: string | null
+          pos_page_cta_href: string
+          pos_page_cta_label: string
+          pos_page_cta_secondary_label: string
+          pos_page_eyebrow: string
+          pos_page_title: string
           seo_description: string | null
           seo_keywords: string | null
           seo_title: string | null
           site_url: string | null
+          story_eyebrow: string
+          story_paragraph_1: string
+          story_paragraph_2: string
+          story_title: string
           twitter_handle: string | null
           updated_at: string
           updated_by: string | null
@@ -617,12 +636,22 @@ export type Database = {
           hero_images?: string[]
           hero_subtitle?: string
           hero_title?: string
+          home_stats?: Json
           id?: boolean
           og_image_url?: string | null
+          pos_page_cta_href?: string
+          pos_page_cta_label?: string
+          pos_page_cta_secondary_label?: string
+          pos_page_eyebrow?: string
+          pos_page_title?: string
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
           site_url?: string | null
+          story_eyebrow?: string
+          story_paragraph_1?: string
+          story_paragraph_2?: string
+          story_title?: string
           twitter_handle?: string | null
           updated_at?: string
           updated_by?: string | null
@@ -636,12 +665,22 @@ export type Database = {
           hero_images?: string[]
           hero_subtitle?: string
           hero_title?: string
+          home_stats?: Json
           id?: boolean
           og_image_url?: string | null
+          pos_page_cta_href?: string
+          pos_page_cta_label?: string
+          pos_page_cta_secondary_label?: string
+          pos_page_eyebrow?: string
+          pos_page_title?: string
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
           site_url?: string | null
+          story_eyebrow?: string
+          story_paragraph_1?: string
+          story_paragraph_2?: string
+          story_title?: string
           twitter_handle?: string | null
           updated_at?: string
           updated_by?: string | null

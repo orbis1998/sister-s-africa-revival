@@ -72,7 +72,7 @@ function POSPage() {
   function openForm(pos?: any) {
     setExpandedSaleId(null);
     if (!pos) {
-      setForm({ name: "", city: "", city_scope: "kinshasa", address: "", phone: "", manager_user_ids: [], _managersLoaded: true });
+      setForm({ name: "", city: "", city_scope: "kinshasa", address: "", phone: "", public_note: "", manager_user_ids: [], _managersLoaded: true });
       return;
     }
     setForm({ ...pos, manager_user_ids: [], _managersLoaded: false });
@@ -120,6 +120,13 @@ function POSPage() {
               <input placeholder="Ville (affichage)" value={form.city ?? ""} onChange={(e) => setForm({ ...form, city: e.target.value })} className="input-admin" />
               <input placeholder="Adresse" value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input-admin" />
               <input placeholder="Téléphone" value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input-admin" />
+              <textarea
+                placeholder="Note publique (affichée sur la page points de vente)"
+                value={form.public_note ?? ""}
+                onChange={(e) => setForm({ ...form, public_note: e.target.value })}
+                rows={3}
+                className="input-admin resize-none"
+              />
               <div className="rounded-xl border border-border bg-cream/40 p-4">
                 <label className="mb-2 block text-[10px] uppercase tracking-widest text-muted-foreground">
                   Managers responsables (permission POS · même direction)

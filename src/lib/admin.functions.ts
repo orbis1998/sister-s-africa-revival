@@ -370,7 +370,7 @@ export const adminUpsertPOS = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
     id?: string; name: string; city?: string; city_scope?: StaffDirection | "";
-    address?: string; phone?: string; manager_user_id?: string | null;
+    address?: string; phone?: string; public_note?: string; manager_user_id?: string | null;
     manager_user_ids?: string[];
   }) => d)
   .handler(async ({ data, context }) => {
@@ -394,6 +394,7 @@ export const adminUpsertPOS = createServerFn({ method: "POST" })
         city_scope: posPayload.city_scope || null,
         address: posPayload.address,
         phone: posPayload.phone,
+        public_note: posPayload.public_note ?? null,
         manager_user_id: primaryManagerId,
       }).select("id").single();
       if (error) throw new Error(error.message);
@@ -567,6 +568,16 @@ export const adminUpdateSiteSettings = createServerFn({ method: "POST" })
     og_image_url?: string;
     site_url?: string;
     twitter_handle?: string;
+    pos_page_eyebrow?: string;
+    pos_page_title?: string;
+    pos_page_cta_label?: string;
+    pos_page_cta_href?: string;
+    pos_page_cta_secondary_label?: string;
+    story_eyebrow?: string;
+    story_title?: string;
+    story_paragraph_1?: string;
+    story_paragraph_2?: string;
+    home_stats?: { value: string; label: string }[];
   }) => d)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as any);
@@ -575,6 +586,7 @@ export const adminUpdateSiteSettings = createServerFn({ method: "POST" })
       id: true,
       ...data,
       hero_images: data.hero_images.slice(0, 3).filter(Boolean),
+      home_stats: (data.home_stats ?? []).slice(0, 4),
       updated_by: (context as any).userId,
     });
     if (error) throw new Error(error.message);

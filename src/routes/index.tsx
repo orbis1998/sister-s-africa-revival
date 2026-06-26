@@ -116,27 +116,19 @@ function HomePage() {
       <section className="bg-espresso text-cream py-24">
         <div className="container-page grid md:grid-cols-2 gap-16 items-center">
           <div>
-            <div className="eyebrow text-gold mb-4">Notre histoire</div>
+            <div className="eyebrow text-gold mb-4">{settings.story_eyebrow}</div>
             <h2 className="font-display text-4xl md:text-5xl mb-6 leading-tight">
-              Deux sœurs, une mission&nbsp;: redéfinir la beauté africaine.
+              {settings.story_title}
             </h2>
             <p className="text-cream/80 leading-relaxed mb-4">
-              Née d'un constat simple — la difficulté pour de nombreuses femmes et enfants
-              d'accéder à une nutrition saine et adaptée — The Sisters Africa s'est donné
-              pour mission de formuler des bouillies bio efficaces, accessibles et délicieuses.
+              {settings.story_paragraph_1}
             </p>
             <p className="text-cream/80 leading-relaxed">
-              Aujourd'hui, des milliers de clientes à travers la RDC, le Congo Brazzaville
-              et au-delà nous font confiance pour leur transformation.
+              {settings.story_paragraph_2}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {[
-              { value: "+10K", label: "Clientes accompagnées" },
-              { value: "4", label: "Pays livrés" },
-              { value: "100%", label: "Origine végétale" },
-              { value: "2 sem.", label: "Premiers résultats" },
-            ].map((item, index) => (
+            {(settings.home_stats ?? []).slice(0, 4).map((item, index) => (
               <div
                 key={item.label}
                 className={`group relative overflow-hidden rounded-3xl border border-cream/10 bg-cream/[0.06] p-6 shadow-elegant backdrop-blur transition hover:-translate-y-1 hover:bg-cream/[0.1] sm:p-8 ${

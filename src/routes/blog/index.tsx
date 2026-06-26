@@ -1,61 +1,77 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, Leaf, Sparkles } from "lucide-react";
+import { ArrowRight, MapPin, Phone } from "lucide-react";
 import { fetchPublishedBlogPosts } from "@/lib/blog";
+import { fetchPublicPointsOfSale } from "@/lib/public-pos";
 import { buildSeoMeta } from "@/lib/seo";
+import { defaultSiteSettings, fetchSiteSettings } from "@/lib/site-settings";
 
 export const Route = createFileRoute("/blog/")({
   head: () => buildSeoMeta({
-    title: "Blog & conseils — The Sisters Africa",
-    description: "Guides, conseils et informations utiles pour comprendre les bouillies bio The Sisters Africa, la prise de poids saine et l'accompagnement client.",
+    title: "Points de vente & conseils — The Sisters Africa",
+    description: "Retrouvez nos points de vente partenaires et nos guides pour comprendre les bouillies bio The Sisters Africa.",
     url: "https://thesistersafrica.com/blog",
     type: "website",
   }),
   loader: async () => {
-    const posts = await fetchPublishedBlogPosts();
-    return { posts };
+    const [posts, settings, pointsOfSale] = await Promise.all([
+      fetchPublishedBlogPosts(),
+      fetchSiteSettings().catch(() => defaultSiteSettings),
+      fetchPublicPointsOfSale().catch(() => []),
+    ]);
+    return { posts, settings, pointsOfSale };
   },
   component: BlogPage,
 });
 
 function BlogPage() {
-  const { posts } = Route.useLoaderData();
+  const { posts, settings, pointsOfSale } = Route.useLoaderData();
+  const whatsappHref = `https://wa.me/${settings.whatsapp_number.replace(/\D/g, "")}`;
 
   return (
     <>
       <section className="bg-espresso text-cream">
         <div className="container-page py-20 md:py-28">
           <div className="max-w-3xl">
-            <div className="eyebrow mb-4 text-gold">Blog & conseils</div>
+            <div className="eyebrow mb-4 text-gold">{settings.pos_page_eyebrow}</div>
             <h1 className="font-display text-5xl leading-tight md:text-7xl">
-              Mieux comprendre nos produits avant de commander.
+              {settings.pos_page_title}
             </h1>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/products" className="inline-flex items-center gap-2 rounded-full bg-cream px-6 py-3 text-xs font-medium uppercase tracking-[0.18em] text-espresso hover:bg-gold">
-                Découvrir les produits <ArrowRight className="h-4 w-4" />
+              <Link to={settings.pos_page_cta_href as any} className="inline-flex items-center gap-2 rounded-full bg-cream px-6 py-3 text-xs font-medium uppercase tracking-[0.18em] text-espresso hover:bg-gold">
+                {settings.pos_page_cta_label} <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link to="/contact" className="inline-flex items-center gap-2 rounded-full border border-cream/20 px-6 py-3 text-xs font-medium uppercase tracking-[0.18em] text-cream/90 hover:bg-cream/10">
-                Parler à l'équipe
-              </Link>
+              <a href={whatsappHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-cream/20 px-6 py-3 text-xs font-medium uppercase tracking-[0.18em] text-cream/90 hover:bg-cream/10">
+                {settings.pos_page_cta_secondary_label}
+              </a>
             </div>
           </div>
+
+          {pointsOfSale.length > 0 && (
+            <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {pointsOfSale.map((pos) => (
+                <article key={pos.id} className="rounded-2xl border border-cream/10 bg-cream/[0.06] p-6 backdrop-blur">
+                  <div className="text-xs uppercase tracking-[0.2em] text-gold">{pos.city ?? "Point de vente"}</div>
+                  <h2 className="mt-2 font-display text-2xl text-cream">{pos.name}</h2>
+                  {pos.public_note && <p className="mt-3 text-sm leading-relaxed text-cream/75">{pos.public_note}</p>}
+                  {pos.address && (
+                    <p className="mt-3 flex items-start gap-2 text-sm text-cream/80">
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+                      {pos.address}
+                    </p>
+                  )}
+                  {pos.phone && (
+                    <a href={`tel:${pos.phone.replace(/\s/g, "")}`} className="mt-2 inline-flex items-center gap-2 text-sm text-cream/90 hover:text-gold">
+                      <Phone className="h-4 w-4" /> {pos.phone}
+                    </a>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
       <section className="container-page py-18 md:py-24">
-        <div className="mb-10 grid gap-4 md:grid-cols-3">
-          {[
-            { icon: Leaf, title: "Origine végétale", text: "Bouillies bio d'origine végétale pour adultes et enfants." },
-            { icon: Sparkles, title: "Prise de poids saine", text: "Des routines pensées pour soutenir l'appétit et l'assimilation." },
-            { icon: BookOpen, title: `${posts.length} contenus`, text: "Articles éditables depuis le dashboard admin." },
-          ].map(({ icon: Icon, title, text }) => (
-            <div key={title} className="rounded-2xl border border-border bg-card p-6">
-              <Icon className="mb-4 h-5 w-5 text-copper" />
-              <h2 className="font-display text-xl text-espresso">{title}</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{text}</p>
-            </div>
-          ))}
-        </div>
-
         <div className="grid gap-6 lg:grid-cols-2">
           {posts.map((article, index) => (
             <Link
@@ -79,7 +95,7 @@ function BlogPage() {
                   <h2 className="mt-3 font-display text-3xl text-espresso group-hover:text-copper">{article.title}</h2>
                   <p className="mt-4 text-sm leading-relaxed text-espresso/75">{article.excerpt}</p>
                   <span className="mt-5 inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-copper">
-                    Lire l'article <ArrowRight className="h-3.5 w-3.5" />
+                    En savoir plus <ArrowRight className="h-3.5 w-3.5" />
                   </span>
                 </div>
               </div>

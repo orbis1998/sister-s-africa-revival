@@ -7,7 +7,7 @@ import { Loader2, Upload } from "lucide-react";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { adminUpdateSiteSettings } from "@/lib/admin.functions";
-import { defaultSiteSettings, fetchSiteSettings } from "@/lib/site-settings";
+import { defaultSiteSettings, defaultHomeStats, fetchSiteSettings, type HomeStatCard } from "@/lib/site-settings";
 
 export const Route = createFileRoute("/_authenticated/admin/settings")({
   component: SettingsPage,
@@ -65,7 +65,7 @@ function SettingsPage() {
       <span className="eyebrow">Expérience client</span>
       <h1 className="font-display text-4xl mt-2">Paramètres du site</h1>
       <p className="text-sm text-muted-foreground mt-2">
-        Gérez ici le hero de l'accueil, les images défilantes, le CTA et le numéro WhatsApp.
+        Gérez ici le hero de l'accueil, les images défilantes, le CTA, le numéro WhatsApp, la section Notre histoire et les statistiques.
       </p>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -119,6 +119,83 @@ function SettingsPage() {
       </div>
 
       <div className="mt-8 rounded-2xl border border-border bg-card p-6">
+        <h2 className="font-display text-2xl">Page points de vente</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Texte d'introduction en haut de la page /blog. Les fiches de chaque point de vente se gèrent dans Points de vente.
+        </p>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <Field label="Surtitre">
+            <input value={form.pos_page_eyebrow ?? ""} onChange={(e) => setForm({ ...form, pos_page_eyebrow: e.target.value })} className="input-admin" />
+          </Field>
+          <Field label="Titre principal" className="sm:col-span-2">
+            <input value={form.pos_page_title ?? ""} onChange={(e) => setForm({ ...form, pos_page_title: e.target.value })} className="input-admin" />
+          </Field>
+          <Field label="Label bouton principal">
+            <input value={form.pos_page_cta_label ?? ""} onChange={(e) => setForm({ ...form, pos_page_cta_label: e.target.value })} className="input-admin" />
+          </Field>
+          <Field label="Lien bouton principal">
+            <input value={form.pos_page_cta_href ?? ""} onChange={(e) => setForm({ ...form, pos_page_cta_href: e.target.value })} className="input-admin" />
+          </Field>
+          <Field label="Label bouton WhatsApp" className="sm:col-span-2">
+            <input value={form.pos_page_cta_secondary_label ?? ""} onChange={(e) => setForm({ ...form, pos_page_cta_secondary_label: e.target.value })} className="input-admin" />
+          </Field>
+        </div>
+      </div>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="font-display text-2xl">Notre histoire (accueil)</h2>
+          <div className="mt-5 grid gap-4">
+            <Field label="Surtitre">
+              <input value={form.story_eyebrow ?? ""} onChange={(e) => setForm({ ...form, story_eyebrow: e.target.value })} className="input-admin" />
+            </Field>
+            <Field label="Titre">
+              <input value={form.story_title ?? ""} onChange={(e) => setForm({ ...form, story_title: e.target.value })} className="input-admin" />
+            </Field>
+            <Field label="Paragraphe 1">
+              <textarea value={form.story_paragraph_1 ?? ""} onChange={(e) => setForm({ ...form, story_paragraph_1: e.target.value })} rows={4} className="input-admin resize-none" />
+            </Field>
+            <Field label="Paragraphe 2">
+              <textarea value={form.story_paragraph_2 ?? ""} onChange={(e) => setForm({ ...form, story_paragraph_2: e.target.value })} rows={3} className="input-admin resize-none" />
+            </Field>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="font-display text-2xl">Statistiques accueil</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Les 4 cartes affichées à côté de Notre histoire.</p>
+          <div className="mt-5 space-y-4">
+            {(form.home_stats ?? defaultHomeStats).slice(0, 4).map((stat: HomeStatCard, index: number) => (
+              <div key={index} className="grid gap-3 sm:grid-cols-2 rounded-xl border border-border bg-cream/30 p-4">
+                <Field label={`Valeur ${index + 1}`}>
+                  <input
+                    value={stat.value}
+                    onChange={(e) => {
+                      const next = [...(form.home_stats ?? defaultHomeStats)];
+                      next[index] = { ...next[index], value: e.target.value };
+                      setForm({ ...form, home_stats: next });
+                    }}
+                    className="input-admin"
+                  />
+                </Field>
+                <Field label={`Libellé ${index + 1}`}>
+                  <input
+                    value={stat.label}
+                    onChange={(e) => {
+                      const next = [...(form.home_stats ?? defaultHomeStats)];
+                      next[index] = { ...next[index], label: e.target.value };
+                      setForm({ ...form, home_stats: next });
+                    }}
+                    className="input-admin"
+                  />
+                </Field>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-2xl border border-border bg-card p-6">
         <h2 className="font-display text-2xl">SEO & réseaux sociaux</h2>
         <p className="mt-1 text-xs text-muted-foreground">Meta tags globaux du site (Open Graph, Twitter, Google).</p>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -150,9 +227,9 @@ function SettingsPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <label className="block">
+    <label className={`block ${className ?? ""}`}>
       <span className="mb-2 block text-xs uppercase tracking-widest text-muted-foreground">{label}</span>
       {children}
     </label>
