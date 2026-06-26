@@ -71,17 +71,19 @@ function BlogPage() {
         </div>
       </section>
 
-      <section className="container-page py-18 md:py-24">
+      <section className="relative z-10 container-page py-20 md:py-24">
         <div className="grid gap-6 lg:grid-cols-2">
           {posts.map((article, index) => (
-            <Link
+            <article
               key={article.id}
-              to="/blog/$slug"
-              params={{ slug: article.slug }}
-              className="group block overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-elegant"
+              className="group overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-elegant"
             >
               <div className="grid min-h-full sm:grid-cols-[0.38fr_0.62fr]">
-                <div className="relative flex min-h-56 flex-col justify-between bg-espresso p-7 text-cream">
+                <Link
+                  to="/blog/$slug"
+                  params={{ slug: article.slug }}
+                  className="relative flex min-h-56 flex-col justify-between bg-espresso p-7 text-cream"
+                >
                   {article.cover_image_url ? (
                     <img src={article.cover_image_url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />
                   ) : (
@@ -89,17 +91,27 @@ function BlogPage() {
                   )}
                   <div className="relative text-xs uppercase tracking-[0.22em] text-gold">{article.category}</div>
                   <div className="relative font-display text-7xl text-cream/90">{String(index + 1).padStart(2, "0")}</div>
-                </div>
-                <div className="p-7">
+                </Link>
+                <div className="flex flex-col p-7">
                   <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{article.read_time}</div>
-                  <h2 className="mt-3 font-display text-3xl text-espresso group-hover:text-copper">{article.title}</h2>
-                  <p className="mt-4 text-sm leading-relaxed text-espresso/75">{article.excerpt}</p>
-                  <span className="mt-5 inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-copper">
+                  <Link
+                    to="/blog/$slug"
+                    params={{ slug: article.slug }}
+                    className="mt-3 font-display text-3xl text-espresso transition group-hover:text-copper"
+                  >
+                    {article.title}
+                  </Link>
+                  <p className="mt-4 flex-1 text-sm leading-relaxed text-espresso/75">{article.excerpt}</p>
+                  <Link
+                    to="/blog/$slug"
+                    params={{ slug: article.slug }}
+                    className="mt-5 inline-flex w-fit cursor-pointer items-center gap-2 rounded-full border border-copper/30 px-4 py-2 text-xs uppercase tracking-[0.18em] text-copper transition hover:bg-copper hover:text-cream"
+                  >
                     En savoir plus <ArrowRight className="h-3.5 w-3.5" />
-                  </span>
+                  </Link>
                 </div>
               </div>
-            </Link>
+            </article>
           ))}
         </div>
       </section>
