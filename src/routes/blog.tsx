@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CmsPublicPage } from "@/components/site/CmsPublicPage";
 import { fetchPublishedBlogPosts } from "@/lib/blog";
-import { fetchPublicPointsOfSale } from "@/lib/public-pos";
+import { fetchPublicPageFiches } from "@/lib/page-fiches";
 import { buildSeoMeta } from "@/lib/seo";
 import { defaultSiteSettings, fetchSiteSettings } from "@/lib/site-settings";
 
@@ -16,7 +16,7 @@ export const Route = createFileRoute("/blog")({
     const [posts, settings, pointsOfSale] = await Promise.all([
       fetchPublishedBlogPosts("points_de_vente"),
       fetchSiteSettings().catch(() => defaultSiteSettings),
-      fetchPublicPointsOfSale("retail").catch(() => []),
+      fetchPublicPageFiches("points_de_vente").catch(() => []),
     ]);
     return { posts, settings, pointsOfSale };
   },

@@ -80,14 +80,31 @@ export const adminUpsertBlogPost = createServerFn({ method: "POST" })
     await assertAdmin(context as any);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { slugifyBlogTitle } = await import("@/lib/blog");
+    if (!data.title?.trim()) throw new Error("Le titre est obligatoire");
+    const publicPage = data.public_page ?? "points_de_vente";
+    const slug = slugifyBlogTitle(data.slug?.trim() || data.title || "article");
     const payload = {
-      ...data,
-      slug: slugifyBlogTitle(data.slug?.trim() || data.title || "article"),
+      slug,
+      title: data.title.trim(),
+      excerpt: data.excerpt ?? null,
+      content_html: data.content_html ?? null,
+      cover_image_url: data.cover_image_url ?? null,
+      category: data.category ?? null,
+      read_time: data.read_time ?? "4 min",
+      sort_order: data.sort_order ?? 0,
+      is_published: data.is_published ?? true,
+      public_page: publicPage,
+      seo_title: data.seo_title ?? null,
+      seo_description: data.seo_description ?? null,
       updated_by: (context as any).userId,
     };
-    if (!payload.title?.trim()) throw new Error("Le titre est obligatoire");
-    const { error } = await supabaseAdmin.from("blog_posts").upsert(payload, { onConflict: "slug" });
-    if (error) throw new Error(error.message);
+    if (data.id) {
+      const { error } = await supabaseAdmin.from("blog_posts").update(payload).eq("id", data.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabaseAdmin.from("blog_posts").upsert(payload, { onConflict: "slug,public_page" });
+      if (error) throw new Error(error.message);
+    }
     return { ok: true };
   });
 

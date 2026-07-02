@@ -8,6 +8,7 @@ import { StaffShell } from "@/components/admin/AdminLayout";
 import { PublicPageEditor } from "@/components/admin/PublicPageEditor";
 import { RichContentEditor } from "@/components/admin/RichContentEditor";
 import { adminDeleteBlogPost, adminListBlogPosts, adminUpsertBlogPost } from "@/lib/blog.functions";
+import { adminDeletePageFiche, adminListPageFiches, adminUpsertPageFiche } from "@/lib/page-fiches.functions";
 import { blogPostPathKey, slugifyBlogTitle } from "@/lib/blog";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,7 +20,7 @@ export type PublicPageContentAdminConfig = {
   pageTitle: string;
   pageDescription: string;
   previewPath: string;
-  posCardsHint: string;
+  fichesDescription: string;
   articleScope: ArticleScope;
   articlesDescription: string;
   queryKey: string;
@@ -37,13 +38,39 @@ function matchesScope(publicPage: string | undefined, scope: ArticleScope) {
   return (publicPage ?? scope) === scope;
 }
 
+const emptyArticleForm = {
+  slug: "",
+  title: "",
+  excerpt: "",
+  content_html: "",
+  cover_image_url: "",
+  category: "",
+  read_time: "4 min",
+  sort_order: "0",
+  is_published: true,
+  public_page: "points_de_vente" as ArticleScope,
+  seo_title: "",
+  seo_description: "",
+  coverFile: null as File | null,
+};
+
+const emptyFicheForm = {
+  name: "",
+  city: "",
+  address: "",
+  phone: "",
+  public_note: "",
+  sort_order: "0",
+  is_published: true,
+};
+
 export function PublicPageContentAdmin({ config }: { config: PublicPageContentAdminConfig }) {
   const {
     pagePrefix,
     pageTitle,
     pageDescription,
     previewPath,
-    posCardsHint,
+    fichesDescription,
     articleScope,
     articlesDescription,
     queryKey,
@@ -53,29 +80,33 @@ export function PublicPageContentAdmin({ config }: { config: PublicPageContentAd
   const listFn = useServerFn(adminListBlogPosts);
   const upsertFn = useServerFn(adminUpsertBlogPost);
   const deleteFn = useServerFn(adminDeleteBlogPost);
-  const { data: allPosts = [], isLoading } = useQuery({ queryKey: [queryKey], queryFn: () => listFn() });
+  const listFichesFn = useServerFn(adminListPageFiches);
+  const upsertFicheFn = useServerFn(adminUpsertPageFiche);
+  const deleteFicheFn = useServerFn(adminDeletePageFiche);
+
+  const { data: allPosts = [], isLoading } = useQuery({ queryKey: [queryKey, "posts"], queryFn: () => listFn() });
+  const { data: allFiches = [], isLoading: fichesLoading } = useQuery({
+    queryKey: [queryKey, "fiches"],
+    queryFn: () => listFichesFn(),
+  });
+
   const posts = useMemo(
     () => allPosts.filter((post: any) => matchesScope(post.public_page, articleScope)),
     [allPosts, articleScope],
   );
-
-  const emptyForm = {
-    slug: "",
-    title: "",
-    excerpt: "",
-    content_html: "",
-    cover_image_url: "",
-    category: "",
-    read_time: "4 min",
-    sort_order: "0",
-    is_published: true,
-    public_page: articleScope,
-    seo_title: "",
-    seo_description: "",
-    coverFile: null as File | null,
-  };
+  const fiches = useMemo(
+    () => allFiches.filter((fiche: any) => fiche.public_page === articleScope),
+    [allFiches, articleScope],
+  );
 
   const [form, setForm] = useState<any>(null);
+  const [ficheForm, setFicheForm] = useState<any>(null);
+
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: [queryKey] });
+    qc.invalidateQueries({ queryKey: ["admin-blog"] });
+    qc.invalidateQueries({ queryKey: ["admin-expedition"] });
+  };
 
   const save = useMutation({
     mutationFn: async (data: any) => {
@@ -90,9 +121,7 @@ export function PublicPageContentAdmin({ config }: { config: PublicPageContentAd
     onSuccess: () => {
       toast.success("Article enregistré");
       setForm(null);
-      qc.invalidateQueries({ queryKey: [queryKey] });
-      qc.invalidateQueries({ queryKey: ["admin-blog"] });
-      qc.invalidateQueries({ queryKey: ["admin-expedition"] });
+      invalidateAll();
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -101,9 +130,37 @@ export function PublicPageContentAdmin({ config }: { config: PublicPageContentAd
     mutationFn: (id: string) => deleteFn({ data: { id } }),
     onSuccess: () => {
       toast.success("Article supprimé");
-      qc.invalidateQueries({ queryKey: [queryKey] });
-      qc.invalidateQueries({ queryKey: ["admin-blog"] });
-      qc.invalidateQueries({ queryKey: ["admin-expedition"] });
+      invalidateAll();
+    },
+  });
+
+  const saveFiche = useMutation({
+    mutationFn: (data: any) => upsertFicheFn({
+      data: {
+        id: data.id,
+        public_page: articleScope,
+        name: data.name,
+        city: data.city,
+        address: data.address,
+        phone: data.phone,
+        public_note: data.public_note,
+        sort_order: Number.parseInt(data.sort_order || "0", 10),
+        is_published: data.is_published ?? true,
+      },
+    }),
+    onSuccess: () => {
+      toast.success("Fiche enregistrée");
+      setFicheForm(null);
+      invalidateAll();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const delFiche = useMutation({
+    mutationFn: (id: string) => deleteFicheFn({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Fiche supprimée");
+      invalidateAll();
     },
   });
 
@@ -119,7 +176,7 @@ export function PublicPageContentAdmin({ config }: { config: PublicPageContentAd
           <Link to={previewPath as any} target="_blank" className="btn-ghost text-xs">
             <ExternalLink className="w-3.5 h-3.5" /> Voir la page
           </Link>
-          <button className="btn-hero" onClick={() => setForm({ ...emptyForm })}>
+          <button className="btn-hero" onClick={() => setForm({ ...emptyArticleForm, public_page: articleScope })}>
             <Plus className="w-4 h-4" /> Nouvel article
           </button>
         </div>
@@ -130,8 +187,51 @@ export function PublicPageContentAdmin({ config }: { config: PublicPageContentAd
         title="En-tête de la page"
         description={`Texte d'introduction et boutons en haut de ${previewPath}.`}
         previewPath={previewPath}
-        posCardsHint={posCardsHint}
       />
+
+      <div className="mt-10 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 className="font-display text-2xl">Fiches</h2>
+          <p className="mt-1 text-xs text-muted-foreground">{fichesDescription}</p>
+        </div>
+        <button className="btn-hero" onClick={() => setFicheForm({ ...emptyFicheForm })}>
+          <Plus className="w-4 h-4" /> Nouvelle fiche
+        </button>
+      </div>
+
+      {fichesLoading ? (
+        <div className="mt-6 flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" /> Chargement…
+        </div>
+      ) : fiches.length === 0 ? (
+        <div className="mt-6 rounded-2xl border border-dashed border-border bg-cream/30 p-10 text-center text-sm text-muted-foreground">
+          Aucune fiche pour cette page. Les fiches de cette section sont indépendantes de l'autre page.
+        </div>
+      ) : (
+        <div className="mt-6 space-y-3">
+          {fiches.map((fiche: any) => (
+            <div key={fiche.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4">
+              <div className="min-w-0">
+                <div className="font-display text-xl truncate">{fiche.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {fiche.city || "Sans ville"} · {fiche.is_published ? "Publiée" : "Brouillon"}
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  className="btn-ghost text-xs"
+                  onClick={() => setFicheForm({ ...fiche, sort_order: String(fiche.sort_order) })}
+                >
+                  <Pencil className="w-3.5 h-3.5" /> Modifier
+                </button>
+                <button className="btn-ghost text-xs text-red-700" onClick={() => delFiche.mutate(fiche.id)}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <h2 className="font-display text-2xl mt-10">Articles</h2>
       <p className="mt-1 text-xs text-muted-foreground">{articlesDescription}</p>
@@ -175,6 +275,46 @@ export function PublicPageContentAdmin({ config }: { config: PublicPageContentAd
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {ficheForm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl bg-card p-6 shadow-elegant">
+            <h2 className="font-display text-2xl mb-6">{ficheForm.id ? "Modifier la fiche" : "Nouvelle fiche"}</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Nom" className="sm:col-span-2">
+                <input value={ficheForm.name} onChange={(e) => setFicheForm({ ...ficheForm, name: e.target.value })} className="input-admin" />
+              </Field>
+              <Field label="Ville">
+                <input value={ficheForm.city ?? ""} onChange={(e) => setFicheForm({ ...ficheForm, city: e.target.value })} className="input-admin" />
+              </Field>
+              <Field label="Ordre">
+                <input type="number" value={ficheForm.sort_order ?? "0"} onChange={(e) => setFicheForm({ ...ficheForm, sort_order: e.target.value })} className="input-admin" />
+              </Field>
+              <Field label="Adresse" className="sm:col-span-2">
+                <input value={ficheForm.address ?? ""} onChange={(e) => setFicheForm({ ...ficheForm, address: e.target.value })} className="input-admin" />
+              </Field>
+              <Field label="Téléphone">
+                <input value={ficheForm.phone ?? ""} onChange={(e) => setFicheForm({ ...ficheForm, phone: e.target.value })} className="input-admin" />
+              </Field>
+              <Field label="Note publique" className="sm:col-span-2">
+                <textarea value={ficheForm.public_note ?? ""} onChange={(e) => setFicheForm({ ...ficheForm, public_note: e.target.value })} className="input-admin resize-none" rows={3} />
+              </Field>
+              <Field label="Visibilité" className="sm:col-span-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={ficheForm.is_published} onChange={(e) => setFicheForm({ ...ficheForm, is_published: e.target.checked })} />
+                  Fiche publiée sur le site
+                </label>
+              </Field>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button className="btn-ghost" onClick={() => setFicheForm(null)}>Annuler</button>
+              <button className="btn-hero" disabled={saveFiche.isPending} onClick={() => saveFiche.mutate(ficheForm)}>
+                {saveFiche.isPending ? "Enregistrement…" : "Enregistrer"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

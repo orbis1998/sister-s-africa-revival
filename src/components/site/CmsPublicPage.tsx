@@ -2,7 +2,14 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, MapPin, Phone } from "lucide-react";
 import type { BlogPostPublic } from "@/lib/blog";
 import { blogPostPathKey } from "@/lib/blog";
-import type { PublicPointOfSale } from "@/lib/public-pos";
+type PageDisplayCard = {
+  id: string;
+  name: string;
+  city: string | null;
+  address: string | null;
+  phone: string | null;
+  public_note: string | null;
+};
 
 export type CmsPageHeroConfig = {
   eyebrow: string;
@@ -44,7 +51,7 @@ function BlogArticleCard({ article, index }: { article: BlogPostPublic; index: n
   );
 }
 
-function PosCardsGrid({ points, compact = false }: { points: PublicPointOfSale[]; compact?: boolean }) {
+function PosCardsGrid({ points, compact = false }: { points: PageDisplayCard[]; compact?: boolean }) {
   if (!points.length) return null;
   return (
     <div className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-3 ${compact ? "mt-6" : "mt-14"}`}>
@@ -79,7 +86,7 @@ export function CmsPublicPage({
   hideCtas = false,
 }: {
   hero: CmsPageHeroConfig;
-  pointsOfSale: PublicPointOfSale[];
+  pointsOfSale: PageDisplayCard[];
   posts: BlogPostPublic[];
   showArticles?: boolean;
   hideTitle?: boolean;

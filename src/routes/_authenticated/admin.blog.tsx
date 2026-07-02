@@ -11,9 +11,9 @@ function BlogAdminPage() {
       config={{
         pagePrefix: "pos_page",
         pageTitle: "Points de vente",
-        pageDescription: "Page publique /blog — en-tête, fiches magasins et articles conseils.",
+        pageDescription: "Page publique /blog — en-tête, fiches et articles conseils. Contenu indépendant de la page Expédition.",
         previewPath: "/blog",
-        posCardsHint: "Fiches magasins : Admin → Magasins POS → Affichage public « Page points de vente ».",
+        fichesDescription: "Cartes affichées en haut de la page points de vente. Indépendantes de la page expédition.",
         articleScope: "points_de_vente",
         articlesDescription: "Articles affichés en bas de la page points de vente.",
         queryKey: "admin-blog",

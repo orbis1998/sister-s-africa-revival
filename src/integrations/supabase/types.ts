@@ -62,6 +62,48 @@ export type Database = {
         }
         Relationships: []
       }
+      public_page_fiches: {
+        Row: {
+          address: string | null
+          city: string | null
+          created_at: string
+          id: string
+          is_published: boolean
+          name: string
+          phone: string | null
+          public_note: string | null
+          public_page: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          name: string
+          phone?: string | null
+          public_note?: string | null
+          public_page: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          name?: string
+          phone?: string | null
+          public_note?: string | null
+          public_page?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       blog_posts: {
         Row: {
           category: string | null

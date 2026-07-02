@@ -11,9 +11,9 @@ function ExpeditionPageAdmin() {
       config={{
         pagePrefix: "expedition_page",
         pageTitle: "Expédition",
-        pageDescription: "Page publique /expedition — en-tête, fiches et articles.",
+        pageDescription: "Page publique /expedition — en-tête, fiches et articles. Contenu indépendant de la page Points de vente.",
         previewPath: "/expedition",
-        posCardsHint: "Fiches expédition : Admin → Magasins POS → Affichage public « Page expédition ».",
+        fichesDescription: "Cartes affichées en haut de la page expédition. Indépendantes de la page points de vente.",
         articleScope: "expedition",
         articlesDescription: "Articles affichés en bas de la page expédition.",
         queryKey: "admin-expedition",

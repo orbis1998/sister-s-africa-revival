@@ -128,14 +128,16 @@ function POSPage() {
                 className="input-admin resize-none"
               />
               <select
-                value={form.public_listing ?? "retail"}
+                value={form.public_listing === "contact" ? "contact" : "retail"}
                 onChange={(e) => setForm({ ...form, public_listing: e.target.value })}
                 className="input-admin"
               >
-                <option value="retail">Page points de vente</option>
-                <option value="expedition">Page expédition</option>
-                <option value="contact">Page contact</option>
+                <option value="retail">Non affiché sur le site</option>
+                <option value="contact">Page contact (bureaux)</option>
               </select>
+              <p className="text-xs text-muted-foreground">
+                Les fiches points de vente et expédition se gèrent depuis Admin → Points de vente / Expédition.
+              </p>
               <div className="rounded-xl border border-border bg-cream/40 p-4">
                 <label className="mb-2 block text-[10px] uppercase tracking-widest text-muted-foreground">
                   Managers responsables (permission POS · même direction)
