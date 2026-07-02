@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { StaffShell } from "@/components/admin/AdminLayout";
 import { exportCompanyReport, exportCompanyReportPdf } from "@/lib/accounting.functions";
 import { listStaffExpenses, listWholesaleSales } from "@/lib/finance.functions";
-import { ADMIN_REPORT_REGIONS, directionFromCity, formatOrderAmount, formatRegionMoney } from "@/lib/staff-scope";
+import { ADMIN_REPORT_REGIONS, directionFromCity, formatOrderAmount, formatRegionMoney, posDirection } from "@/lib/staff-scope";
 import { LIVE_STATS_QUERY_OPTIONS } from "@/lib/live-stats-query";
 import { AlertTriangle, ClipboardList, DollarSign, Download, FileText, HandCoins, MessageSquare, Package, ShoppingCart, Store, TrendingUp } from "lucide-react";
 
@@ -72,7 +72,7 @@ function AdminDashboard() {
     ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: pos } = useQuery({
-    queryKey: ["admin-pos"], queryFn: async () => (await supabase.from("points_of_sale").select("id, city")).data ?? [],
+    queryKey: ["admin-pos"], queryFn: async () => (await supabase.from("points_of_sale").select("id, city, city_scope")).data ?? [],
     ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: stock } = useQuery({
@@ -108,7 +108,7 @@ function AdminDashboard() {
     ...LIVE_STATS_QUERY_OPTIONS,
   });
 
-  const posScopeById = Object.fromEntries((pos ?? []).map((p: any) => [p.id, directionFromCity(p.city)]));
+  const posScopeById = Object.fromEntries((pos ?? []).map((p: any) => [p.id, posDirection(p)]));
   const salesWithScope = (sales ?? []).map((sale: any) => ({ ...sale, city_scope: posScopeById[sale.pos_id] ?? null }));
   const lowStock = (stock ?? []).filter((s: any) => s.quantity <= s.low_stock_threshold).length;
   const ordersWithScope = (orders ?? []).map((o: any) => ({

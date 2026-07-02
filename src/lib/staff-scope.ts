@@ -20,6 +20,14 @@ export function directionFromCity(city?: string | null, countryCode?: string | n
   return null;
 }
 
+/** Prefer stored city_scope; fall back to parsing city label. */
+export function posDirection(pos: { city_scope?: string | null; city?: string | null; country_code?: string | null }): StaffDirection | null {
+  if (pos.city_scope && STAFF_DIRECTIONS.some((d) => d.value === pos.city_scope)) {
+    return pos.city_scope as StaffDirection;
+  }
+  return directionFromCity(pos.city, pos.country_code);
+}
+
 export function directionLabel(direction?: string | null) {
   return STAFF_DIRECTIONS.find((d) => d.value === direction)?.label ?? "Non définie";
 }

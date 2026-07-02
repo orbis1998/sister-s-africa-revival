@@ -9,6 +9,7 @@ import { getMyManagerPermissions } from "@/lib/permissions.functions";
 import { directionLabel, formatScopedMoney, directionDeliveryCurrency, directionCurrency } from "@/lib/staff-scope";
 import { LIVE_STATS_QUERY_OPTIONS } from "@/lib/live-stats-query";
 import { supabase } from "@/integrations/supabase/client";
+import { listPosSales } from "@/lib/pos.functions";
 import { formatVariantLabel } from "@/lib/product-variants";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ function ManagerDashboard() {
   const listWholesale = useServerFn(listWholesaleSales);
   const listFees = useServerFn(listCommuneDeliveryFees);
   const saveFees = useServerFn(upsertCommuneDeliveryFees);
+  const listPos = useServerFn(listPosSales);
   const [expense, setExpense] = useState({ amount_usd: "", amount_fcfa: "", note: "" });
   const [wholesale, setWholesale] = useState({
     pos_id: "",
@@ -134,9 +136,9 @@ function ManagerDashboard() {
     ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: posSales = [] } = useQuery({
-    queryKey: ["manager-pos-sales", posIds.join(",")],
-    enabled: canViewAccounting && posIds.length > 0,
-    queryFn: async () => (await supabase.from("pos_sales").select("*").in("pos_id", posIds).order("created_at", { ascending: false }).limit(50)).data ?? [],
+    queryKey: ["manager-pos-sales", user?.id, profile?.city_scope, posIds.join(",")],
+    enabled: canViewAccounting && !!user,
+    queryFn: () => listPos({ data: { limit: 200 } }),
     ...LIVE_STATS_QUERY_OPTIONS,
   });
   const { data: deliveryFees = [], refetch: refetchFees } = useQuery({

@@ -1,5 +1,5 @@
 import type { StaffDirection } from "@/lib/staff-scope";
-import { directionFromCity } from "@/lib/staff-scope";
+import { posDirection } from "@/lib/staff-scope";
 import { normalizeManagerPermissions } from "@/lib/permissions.functions";
 
 export type ManagerPermRow = {
@@ -44,7 +44,7 @@ export async function resolveManagerCityScope(supabaseAdmin: any, userId: string
     .in("id", posIds);
 
   for (const pos of posRows ?? []) {
-    const scope = (pos.city_scope as StaffDirection | null) ?? directionFromCity(pos.city);
+    const scope = posDirection(pos);
     if (scope) {
       await supabaseAdmin.from("profiles").update({ city_scope: scope }).eq("id", userId);
       return scope;

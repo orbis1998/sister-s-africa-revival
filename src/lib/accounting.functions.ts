@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { ADMIN_REPORT_REGIONS, directionFromCity, directionLabel } from "@/lib/staff-scope";
+import { ADMIN_REPORT_REGIONS, directionLabel, posDirection } from "@/lib/staff-scope";
 import { normalizeManagerPermissions } from "@/lib/permissions.functions";
 import { resolveManagerCityScope } from "@/lib/manager-finance-scope";
 import { jsPDF } from "jspdf";
@@ -40,9 +40,9 @@ async function buildCompanyReport(fromInput?: string, toInput?: string, cityScop
   const to = toInput ? new Date(toInput) : new Date();
   to.setHours(23, 59, 59, 999);
 
-  const { data: posList } = await supabaseAdmin.from("points_of_sale").select("id, name, city");
+  const { data: posList } = await supabaseAdmin.from("points_of_sale").select("id, name, city, city_scope");
   const scopedPosIds = cityScope
-    ? (posList ?? []).filter((p: any) => directionFromCity(p.city) === cityScope).map((p: any) => p.id)
+    ? (posList ?? []).filter((p: any) => posDirection(p) === cityScope).map((p: any) => p.id)
     : null;
 
   let ordersQuery = supabaseAdmin.from("orders").select("*")
@@ -70,10 +70,10 @@ async function buildCompanyReport(fromInput?: string, toInput?: string, cityScop
     expensesQuery,
   ]);
 
-  const posScope = Object.fromEntries((posList ?? []).map((p: any) => [p.id, p.city]));
+  const posScopeById = Object.fromEntries((posList ?? []).map((p: any) => [p.id, posDirection(p)]));
   const posSalesScoped = (posSales ?? []).map((sale: any) => ({
     ...sale,
-    city_scope: directionFromCity(posScope[sale.pos_id]),
+    city_scope: posScopeById[sale.pos_id] ?? null,
   }));
 
   const deliveredOrders = (orders ?? []).filter((o: any) => o.status === "delivered");

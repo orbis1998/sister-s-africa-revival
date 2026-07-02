@@ -9,6 +9,7 @@ import { exportCompanyReport, exportCompanyReportPdf } from "@/lib/accounting.fu
 import { listStaffExpenses, listWholesaleSales } from "@/lib/finance.functions";
 import { getMyManagerPermissions } from "@/lib/permissions.functions";
 import { useAuth } from "@/lib/auth";
+import { listPosSales } from "@/lib/pos.functions";
 import { directionLabel, formatOrderAmount, formatScopedMoney } from "@/lib/staff-scope";
 import { ClipboardList, Download, FileText, HandCoins, ShoppingCart, TrendingUp, Wallet } from "lucide-react";
 
@@ -35,6 +36,7 @@ function ManagerAccountingPage() {
   const listWholesale = useServerFn(listWholesaleSales);
   const exportReportFn = useServerFn(exportCompanyReport);
   const exportPdfFn = useServerFn(exportCompanyReportPdf);
+  const listPos = useServerFn(listPosSales);
   const [reportFrom, setReportFrom] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
   const [reportTo, setReportTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [exporting, setExporting] = useState(false);
@@ -60,9 +62,9 @@ function ManagerAccountingPage() {
     queryFn: async () => (await supabase.from("orders").select("*").eq("status", "delivered").eq("city_scope", profile!.city_scope!).order("delivered_at", { ascending: false }).limit(200)).data ?? [],
   });
   const { data: posSales = [] } = useQuery({
-    queryKey: ["manager-accounting-pos", user?.id, posIds.join(",")],
-    enabled: posIds.length > 0,
-    queryFn: async () => (await supabase.from("pos_sales").select("*").in("pos_id", posIds).order("created_at", { ascending: false }).limit(200)).data ?? [],
+    queryKey: ["manager-accounting-pos", user?.id, profile?.city_scope, posIds.join(",")],
+    enabled: !!user,
+    queryFn: () => listPos({ data: { limit: 200 } }),
   });
   const { data: wholesaleSales = [] } = useQuery({
     queryKey: ["manager-accounting-wholesale", user?.id],
