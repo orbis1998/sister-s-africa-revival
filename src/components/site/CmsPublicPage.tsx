@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, MapPin, Phone } from "lucide-react";
 import type { BlogPostPublic } from "@/lib/blog";
-import { blogPostPathKey } from "@/lib/blog";
+import { blogPostPathKey, blogArticleSearch } from "@/lib/blog";
 type PageDisplayCard = {
   id: string;
   name: string;
@@ -26,6 +26,7 @@ function BlogArticleCard({ article, index }: { article: BlogPostPublic; index: n
     <Link
       to="/article/$slug"
       params={{ slug: articleKey }}
+      search={blogArticleSearch(article)}
       className="group block overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-elegant"
     >
       <div className="grid min-h-full sm:grid-cols-[0.38fr_0.62fr]">

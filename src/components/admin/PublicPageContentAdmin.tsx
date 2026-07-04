@@ -9,7 +9,7 @@ import { PublicPageEditor } from "@/components/admin/PublicPageEditor";
 import { RichContentEditor } from "@/components/admin/RichContentEditor";
 import { adminDeleteBlogPost, adminListBlogPosts, adminUpsertBlogPost } from "@/lib/blog.functions";
 import { adminDeletePageFiche, adminListPageFiches, adminUpsertPageFiche } from "@/lib/page-fiches.functions";
-import { blogPostPathKey, slugifyBlogTitle } from "@/lib/blog";
+import { blogPostPathKey, blogArticleSearch, slugifyBlogTitle } from "@/lib/blog";
 import { supabase } from "@/integrations/supabase/client";
 
 type PagePrefix = "pos_page" | "expedition_page";
@@ -260,7 +260,7 @@ export function PublicPageContentAdmin({ config }: { config: PublicPageContentAd
                 </div>
               </div>
               <div className="flex gap-2 shrink-0">
-                <Link to="/article/$slug" params={{ slug: blogPostPathKey(post) }} className="btn-ghost text-xs" target="_blank">
+                <Link to="/article/$slug" params={{ slug: blogPostPathKey(post) }} search={blogArticleSearch(post)} className="btn-ghost text-xs" target="_blank">
                   <ExternalLink className="w-3.5 h-3.5" /> Voir
                 </Link>
                 <button

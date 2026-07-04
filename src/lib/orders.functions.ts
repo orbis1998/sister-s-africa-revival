@@ -217,16 +217,16 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
       if (!o || o.assigned_to !== ctx.userId) throw new Error("Forbidden");
     }
     const patch: any = { status: data.status };
-    if (data.status === "delivered") patch.delivered_at = new Date().toISOString();
-    const { error } = await supabaseAdmin.from("orders").update(patch).eq("id", data.order_id);
-    if (error) throw new Error(error.message);
     if (data.status === "delivered") {
-      const { error: stockErr } = await supabaseAdmin.rpc("record_order_delivery_stock", {
+      const { error: deliverErr } = await supabaseAdmin.rpc("deliver_order_with_stock", {
         p_order_id: data.order_id,
         p_actor: ctx.userId,
       });
-      if (stockErr) throw new Error(stockErr.message);
+      if (deliverErr) throw new Error(deliverErr.message);
+      return { ok: true };
     }
+    const { error } = await supabaseAdmin.from("orders").update(patch).eq("id", data.order_id);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 

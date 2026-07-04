@@ -1,10 +1,16 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { fetchBlogPostBySlugPublic } from "@/lib/blog";
+import { fetchBlogPostBySlugPublic, type BlogPublicPage } from "@/lib/blog";
 import { RichContent } from "@/components/site/RichContent";
 import { buildSeoMeta } from "@/lib/seo";
 import { ArrowLeft } from "lucide-react";
+import { z } from "zod";
+
+const searchSchema = z.object({
+  page: z.enum(["points_de_vente", "expedition"]).optional(),
+});
 
 export const Route = createFileRoute("/article/$slug")({
+  validateSearch: (search) => searchSchema.parse(search),
   head: ({ loaderData }) => {
     const post = loaderData?.post;
     return buildSeoMeta({
@@ -15,8 +21,12 @@ export const Route = createFileRoute("/article/$slug")({
       type: "article",
     });
   },
-  loader: async ({ params }) => {
-    const post = await fetchBlogPostBySlugPublic(params.slug);
+  loader: async ({ params, location }) => {
+    const pageParam = new URLSearchParams(location.search).get("page");
+    const page = pageParam === "expedition" || pageParam === "points_de_vente"
+      ? (pageParam as BlogPublicPage)
+      : undefined;
+    const post = await fetchBlogPostBySlugPublic(params.slug, page);
     if (!post) throw notFound();
     return { post };
   },
@@ -31,13 +41,15 @@ export const Route = createFileRoute("/article/$slug")({
 
 function ArticlePage() {
   const { post } = Route.useLoaderData();
+  const backTo = post.public_page === "expedition" ? "/expedition" : "/blog";
+  const backLabel = post.public_page === "expedition" ? "Expédition" : "Points de vente";
 
   return (
     <>
       <section className="bg-espresso text-cream">
         <div className="container-page py-16 md:py-24">
-          <Link to="/blog" className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-cream/70 hover:text-gold">
-            <ArrowLeft className="h-3.5 w-3.5" /> Points de vente
+          <Link to={backTo as any} className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-cream/70 hover:text-gold">
+            <ArrowLeft className="h-3.5 w-3.5" /> {backLabel}
           </Link>
           <div className="mt-6 max-w-3xl">
             <div className="text-xs uppercase tracking-[0.22em] text-gold">{post.category}</div>
