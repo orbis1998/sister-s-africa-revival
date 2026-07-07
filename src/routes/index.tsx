@@ -67,7 +67,7 @@ function HomePage() {
             </Link>
           </div>
           <div className="mt-10 grid grid-cols-3 gap-4 border-t border-cream/20 pt-7 text-[11px] text-cream/70">
-            <div><strong className="font-display text-cream text-2xl block leading-none">10K+</strong> clientes</div>
+            <div><strong className="font-display text-cream text-2xl block leading-none">100K+</strong> clients et clientes</div>
             <div><strong className="font-display text-cream text-2xl block leading-none">3-6kg</strong> en 2 sem.</div>
             <div><strong className="font-display text-cream text-2xl block leading-none">100%</strong> bio végétal</div>
           </div>
