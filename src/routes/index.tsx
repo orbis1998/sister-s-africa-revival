@@ -7,7 +7,7 @@ import { fetchApprovedReviews, type PublicReview } from "@/lib/reviews";
 import { getPublicReviews } from "@/lib/reviews.functions";
 import { defaultSiteSettings, fetchSiteSettings, type SiteSettings } from "@/lib/site-settings";
 import { ProductCard } from "@/components/site/ProductCard";
-import { ArrowRight, Leaf, ShieldCheck, Truck, HeartHandshake, Star } from "lucide-react";
+import { ArrowRight, Leaf, ShieldCheck, Truck, HeartHandshake, Star, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/")({
@@ -30,7 +30,7 @@ export const Route = createFileRoute("/")({
           console.error("Site settings loader failed", error);
           return defaultSiteSettings;
         }),
-        fetchApprovedReviews({ limit: 4 }).catch((error) => {
+        fetchApprovedReviews({ limit: 16 }).catch((error) => {
           console.error("Home reviews loader failed", error);
           return [];
         }),
@@ -67,7 +67,7 @@ function HomePage() {
             </Link>
           </div>
           <div className="mt-10 grid grid-cols-3 gap-4 border-t border-cream/20 pt-7 text-[11px] text-cream/70">
-            <div><strong className="font-display text-cream text-2xl block leading-none">100K+</strong> clients et clientes</div>
+            <div><strong className="font-display text-cream text-2xl block leading-none">100K+</strong> clients</div>
             <div><strong className="font-display text-cream text-2xl block leading-none">3-6kg</strong> en 2 sem.</div>
             <div><strong className="font-display text-cream text-2xl block leading-none">100%</strong> bio végétal</div>
           </div>
@@ -170,44 +170,93 @@ function HomeReviews({ initialReviews }: { initialReviews: PublicReview[] }) {
   const getReviews = useServerFn(getPublicReviews);
   const { data: reviews = initialReviews } = useQuery({
     queryKey: ["public-reviews", "home"],
-    queryFn: () => getReviews({ data: { limit: 4 } }),
+    queryFn: () => getReviews({ data: { limit: 16 } }),
     initialData: initialReviews,
     placeholderData: (prev) => prev ?? initialReviews,
     staleTime: 60_000,
     refetchInterval: 120_000,
     refetchOnWindowFocus: true,
   });
+
+  const marqueeReviews = reviews.length > 1 ? [...reviews, ...reviews] : reviews;
+
   return (
-    <section className="container-page py-24">
-      <div className="mb-12 max-w-2xl">
+    <section className="overflow-hidden py-24">
+      <div className="container-page mb-12 max-w-2xl">
         <div className="eyebrow mb-3">Avis validés</div>
         <h2 className="font-display text-4xl text-espresso md:text-5xl">Elles ont testé nos formules</h2>
         <p className="mt-4 text-muted-foreground">
           Chaque témoignage publié a été vérifié par notre équipe avant d'apparaître ici.
         </p>
       </div>
+
       {reviews.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-card p-8 text-sm text-muted-foreground">
-          Aucun avis validé pour le moment. Les témoignages apparaîtront ici après validation par l'administration.
+        <div className="container-page">
+          <div className="rounded-2xl border border-border bg-card p-8 text-sm text-muted-foreground">
+            Aucun avis validé pour le moment. Les témoignages apparaîtront ici après validation par l'administration.
+          </div>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {reviews.map((review) => (
-            <article key={review.id} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-              <div className="mb-4 flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <Star key={n} className={`h-4 w-4 ${n <= review.rating ? "fill-gold text-gold" : "text-border"}`} />
-                ))}
-              </div>
-              <p className="text-sm leading-relaxed text-espresso/80 italic">&quot;{review.comment}&quot;</p>
-              <div className="mt-5 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                {review.author_name}{review.location ? ` · ${review.location}` : ""}
-              </div>
-            </article>
-          ))}
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-background via-background/90 to-transparent sm:w-28" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-background via-background/90 to-transparent sm:w-28" />
+          <div className="reviews-marquee-track flex w-max gap-5 px-5 sm:gap-6 sm:px-6">
+            {marqueeReviews.map((review, index) => (
+              <ReviewMarqueeCard key={`${review.id}-${index}`} review={review} />
+            ))}
+          </div>
         </div>
       )}
     </section>
+  );
+}
+
+function PremiumStars({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star
+          key={n}
+          className={`h-4 w-4 drop-shadow-sm ${
+            n <= rating
+              ? "fill-gold text-gold [filter:drop-shadow(0_1px_6px_oklch(0.78_0.10_80_/_0.45))]"
+              : "text-border/80"
+          }`}
+          strokeWidth={1.5}
+        />
+      ))}
+      <span className="ml-1.5 inline-flex items-center gap-0.5 text-sm leading-none" aria-hidden>
+        <span className="premium-emoji">✨</span>
+        <span className="premium-emoji text-[11px] opacity-90">💛</span>
+      </span>
+    </div>
+  );
+}
+
+function ReviewMarqueeCard({ review }: { review: PublicReview }) {
+  return (
+    <article className="group relative w-[min(88vw,22rem)] shrink-0 overflow-hidden rounded-3xl border border-gold/15 bg-gradient-to-br from-card via-card to-clay/35 p-6 shadow-[0_18px_50px_-28px_oklch(0.45_0.13_40_/_0.45)] transition duration-500 hover:-translate-y-1 hover:border-gold/30 sm:w-[24rem] sm:p-7">
+      <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gold/10 blur-2xl transition group-hover:bg-gold/20" />
+      <div className="relative">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <PremiumStars rating={review.rating} />
+          <Sparkles className="h-4 w-4 shrink-0 text-gold/70" strokeWidth={1.5} />
+        </div>
+        <p className="text-sm leading-relaxed text-espresso/90">
+          {review.comment}
+        </p>
+        <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+          <div className="text-xs font-medium uppercase tracking-[0.18em] text-espresso">
+            {review.author_name}
+          </div>
+          {review.location && (
+            <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+              {review.location}
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
   );
 }
 
