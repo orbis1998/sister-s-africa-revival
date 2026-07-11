@@ -76,8 +76,6 @@ export const countries: Country[] = [
         communes: simpleCommunes(["Lubumbashi", "Kampemba", "Kenya", "Katuba", "Rwashi", "Annexe"]),
       },
       { name: "Kolwezi", whatsapp: "243810113198", whatsappDisplay: "+243 810 113 198", communes: simpleCommunes(["Manika", "Dilala"]) },
-      { name: "Likasi", whatsapp: "243810113198", whatsappDisplay: "+243 810 113 198", communes: simpleCommunes(["Likasi", "Panda", "Shituru"]) },
-      { name: "Matadi", communes: simpleCommunes(["Matadi", "Nzanza", "Mvuzi"]) },
     ],
   },
   {

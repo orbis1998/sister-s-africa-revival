@@ -7,7 +7,8 @@ import { fetchApprovedReviews, type PublicReview } from "@/lib/reviews";
 import { getPublicReviews } from "@/lib/reviews.functions";
 import { defaultSiteSettings, fetchSiteSettings, type SiteSettings } from "@/lib/site-settings";
 import { ProductCard } from "@/components/site/ProductCard";
-import { ArrowRight, Leaf, ShieldCheck, Truck, HeartHandshake, Star, Sparkles } from "lucide-react";
+import { ArrowRight, Leaf, ShieldCheck, Truck, HeartHandshake } from "lucide-react";
+import { ReviewsMarquee } from "@/components/site/ReviewMarquee";
 import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/")({
@@ -178,8 +179,6 @@ function HomeReviews({ initialReviews }: { initialReviews: PublicReview[] }) {
     refetchOnWindowFocus: true,
   });
 
-  const marqueeReviews = reviews.length > 1 ? [...reviews, ...reviews] : reviews;
-
   return (
     <section className="overflow-hidden py-24">
       <div className="container-page mb-12 max-w-2xl">
@@ -197,66 +196,9 @@ function HomeReviews({ initialReviews }: { initialReviews: PublicReview[] }) {
           </div>
         </div>
       ) : (
-        <div className="relative">
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-background via-background/90 to-transparent sm:w-28" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-background via-background/90 to-transparent sm:w-28" />
-          <div className="reviews-marquee-track flex w-max gap-5 px-5 sm:gap-6 sm:px-6">
-            {marqueeReviews.map((review, index) => (
-              <ReviewMarqueeCard key={`${review.id}-${index}`} review={review} />
-            ))}
-          </div>
-        </div>
+        <ReviewsMarquee reviews={reviews} />
       )}
     </section>
-  );
-}
-
-function PremiumStars({ rating }: { rating: number }) {
-  return (
-    <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <Star
-          key={n}
-          className={`h-4 w-4 drop-shadow-sm ${
-            n <= rating
-              ? "fill-gold text-gold [filter:drop-shadow(0_1px_6px_oklch(0.78_0.10_80_/_0.45))]"
-              : "text-border/80"
-          }`}
-          strokeWidth={1.5}
-        />
-      ))}
-      <span className="ml-1.5 inline-flex items-center gap-0.5 text-sm leading-none" aria-hidden>
-        <span className="premium-emoji">✨</span>
-        <span className="premium-emoji text-[11px] opacity-90">💛</span>
-      </span>
-    </div>
-  );
-}
-
-function ReviewMarqueeCard({ review }: { review: PublicReview }) {
-  return (
-    <article className="group relative w-[min(88vw,22rem)] shrink-0 overflow-hidden rounded-3xl border border-gold/15 bg-gradient-to-br from-card via-card to-clay/35 p-6 shadow-[0_18px_50px_-28px_oklch(0.45_0.13_40_/_0.45)] transition duration-500 hover:-translate-y-1 hover:border-gold/30 sm:w-[24rem] sm:p-7">
-      <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gold/10 blur-2xl transition group-hover:bg-gold/20" />
-      <div className="relative">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <PremiumStars rating={review.rating} />
-          <Sparkles className="h-4 w-4 shrink-0 text-gold/70" strokeWidth={1.5} />
-        </div>
-        <p className="text-sm leading-relaxed text-espresso/90">
-          {review.comment}
-        </p>
-        <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
-          <div className="text-xs font-medium uppercase tracking-[0.18em] text-espresso">
-            {review.author_name}
-          </div>
-          {review.location && (
-            <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-              {review.location}
-            </div>
-          )}
-        </div>
-      </div>
-    </article>
   );
 }
 
