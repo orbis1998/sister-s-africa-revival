@@ -16,7 +16,7 @@ export function buildSeoMeta(input: SeoInput = {}) {
   const description =
     input.description ??
     "Mass Gainer, Super Grow et Peanut Butter : bouillies bio d'origine végétale. Livraison à Kinshasa, Lubumbashi, Brazzaville et Pointe-Noire.";
-  const image = input.image ?? "https://thesistersafrica.com/og-default.jpg";
+  const image = input.image ?? "https://thesistersafrica.com/logo.png";
   const url = input.url ?? "https://thesistersafrica.com";
   const type = input.type ?? "website";
   const twitter = input.twitterHandle ?? "@thesistersafrica";

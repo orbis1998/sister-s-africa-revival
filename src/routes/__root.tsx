@@ -73,11 +73,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       description: "Mass Gainer, Super Grow et Peanut Butter : bouillies bio d'origine végétale. Livraison à Kinshasa, Lubumbashi, Brazzaville et Pointe-Noire.",
       keywords: "The Sisters Africa, bouillie bio, prise de poids, Mass Gainer, Super Grow, Kinshasa, Brazzaville, Pointe-Noire",
       url: "https://thesistersafrica.com",
+      image: "https://thesistersafrica.com/logo.png",
     });
     return {
       ...seo,
       links: [
         ...(seo.links ?? []),
+        { rel: "icon", type: "image/png", href: "/favicon.png" },
+        { rel: "apple-touch-icon", href: "/logo.png" },
         { rel: "stylesheet", href: appCss },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },

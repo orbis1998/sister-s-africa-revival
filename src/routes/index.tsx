@@ -17,7 +17,7 @@ export const Route = createFileRoute("/")({
       { title: "The Sisters Africa — Bouillies bio pour une prise de poids saine" },
       { name: "description", content: "Mass Gainer, Super Grow et Peanut Butter — bouillies bio pour adultes et enfants. Livraison RDC & Congo Brazzaville." },
       { property: "og:title", content: "The Sisters Africa" },
-      { property: "og:image", content: heroImg },
+      { property: "og:image", content: "https://thesistersafrica.com/logo.png" },
     ],
   }),
   loader: async () => {
