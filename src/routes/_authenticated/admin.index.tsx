@@ -61,7 +61,7 @@ function formatUsd(amount: number) {
 }
 
 function formatFcfa(amount: number) {
-  return `${amount.toLocaleString("fr-FR")} FCFA`;
+  return `₣${amount.toLocaleString("fr-FR")}`;
 }
 
 function AdminDashboard() {
