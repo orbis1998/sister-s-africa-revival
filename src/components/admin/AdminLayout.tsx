@@ -1,10 +1,9 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, Package, Boxes, Store, LogOut, Truck, Briefcase, ClipboardList, Star, Settings, ShoppingCart, HandCoins, BookOpen, Wallet, MapPin, Plane } from "lucide-react";
+import { LayoutDashboard, Users, Package, Boxes, Store, LogOut, Truck, Briefcase, ClipboardList, Star, Settings, ShoppingCart, HandCoins, BookOpen, Wallet } from "lucide-react";
 import { useAuth, type AppRole } from "@/lib/auth";
 import { useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { getMyManagerPermissions, normalizeManagerPermissions, type ManagerPermissions } from "@/lib/permissions.functions";
+import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.png";
 
 type PermissionKey =
@@ -17,30 +16,7 @@ type PermissionKey =
   | "can_record_expenses"
   | "can_manage_pos"
   | "can_manage_users";
-type NavLink = { to: string; label: string; icon: any; exact?: boolean; permissions?: PermissionKey[]; requireAll?: boolean };
-
-function effectiveManagerPerms(perms: ManagerPermissions | null | undefined) {
-  if (!perms) return null;
-  return { ...perms, ...normalizeManagerPermissions(perms) };
-}
-
-function managerLinkVisible(perms: ManagerPermissions | null | undefined, link: NavLink) {
-  const effective = effectiveManagerPerms(perms);
-  if (!link.permissions?.length) return true;
-  if (!effective) return false;
-  return link.requireAll
-    ? link.permissions.every((permission) => effective[permission] === true)
-    : link.permissions.some((permission) => effective[permission] === true);
-}
-
-function managerHasPermission(perms: ManagerPermissions | null | undefined, required: PermissionKey[], requireAll = false) {
-  const effective = effectiveManagerPerms(perms);
-  if (!required.length) return true;
-  if (!effective) return false;
-  return requireAll
-    ? required.every((permission) => effective[permission] === true)
-    : required.some((permission) => effective[permission] === true);
-}
+type NavLink = { to: string; label: string; icon: any; exact?: boolean; permissions?: PermissionKey[] };
 
 const adminLinks: NavLink[] = [
   { to: "/admin", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
@@ -49,23 +25,16 @@ const adminLinks: NavLink[] = [
   { to: "/admin/stock", label: "Stock", icon: Boxes },
   { to: "/admin/logistics", label: "Logistique", icon: ClipboardList },
   { to: "/admin/wholesale", label: "Vente en gros", icon: HandCoins },
+  { to: "/admin/expenses", label: "Dépenses", icon: Wallet },
   { to: "/admin/reviews", label: "Avis clients", icon: Star },
-  { to: "/admin/blog", label: "Points de vente", icon: BookOpen },
-  { to: "/admin/expedition-page", label: "Expédition", icon: Plane },
-  { to: "/admin/contact-page", label: "Contact", icon: MapPin },
-  { to: "/admin/pos", label: "Magasins POS", icon: Store },
+  { to: "/admin/blog", label: "Blog", icon: BookOpen },
+  { to: "/admin/pos", label: "Points de vente", icon: Store },
   { to: "/admin/settings", label: "Paramètres", icon: Settings },
 ];
 
 export function StaffShell({
-  children, title, requiredRole, requiredPermission, requireAllPermissions,
-}: {
-  children: ReactNode;
-  title: string;
-  requiredRole: AppRole | AppRole[];
-  requiredPermission?: PermissionKey | PermissionKey[];
-  requireAllPermissions?: boolean;
-}) {
+  children, title, requiredRole, requiredPermission,
+}: { children: ReactNode; title: string; requiredRole: AppRole | AppRole[]; requiredPermission?: PermissionKey | PermissionKey[] }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { roles, loading, signOut, user } = useAuth();
   const navigate = useNavigate();
@@ -73,52 +42,43 @@ export function StaffShell({
   const primaryRole = roles.includes("admin") && allowedRoles.includes("admin")
     ? "admin"
     : allowedRoles.find((role) => roles.includes(role)) ?? allowedRoles[0];
-  const fetchManagerPerms = useServerFn(getMyManagerPermissions);
   const requiredPermissions = requiredPermission ? (Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission]) : [];
   const managerPerms = useQuery({
-    queryKey: ["manager-permissions", user?.id],
+    queryKey: ["staff-shell-manager-perms", user?.id],
     enabled: !!user && roles.includes("manager") && !roles.includes("admin"),
-    queryFn: () => fetchManagerPerms({}),
-    staleTime: 30_000,
+    queryFn: async () => {
+      const { data } = await supabase.from("manager_permissions").select("*").eq("user_id", user!.id).maybeSingle();
+      return data as Record<string, any> | null;
+    },
   });
   const hasRequiredPermission =
     !requiredPermissions.length ||
     roles.includes("admin") ||
     !roles.includes("manager") ||
-    managerHasPermission(managerPerms.data, requiredPermissions, !!requireAllPermissions);
+    requiredPermissions.some((permission) => managerPerms.data?.[permission] === true);
 
   useEffect(() => {
     if (!loading && user && !allowedRoles.some((role) => roles.includes(role))) {
       navigate({ to: "/auth" });
-      return;
     }
-    if (
-      !loading &&
-      user &&
-      roles.includes("manager") &&
-      !roles.includes("admin") &&
-      requiredPermissions.length &&
-      managerPerms.isSuccess &&
-      !hasRequiredPermission
-    ) {
+    if (!loading && user && roles.includes("manager") && !roles.includes("admin") && requiredPermissions.length && !managerPerms.isLoading && !hasRequiredPermission) {
       navigate({ to: "/manager" });
     }
-  }, [loading, roles, user, allowedRoles, requiredPermissions, managerPerms.isSuccess, hasRequiredPermission, navigate]);
+  }, [loading, roles, user, allowedRoles, requiredPermissions, managerPerms.isLoading, hasRequiredPermission, navigate]);
 
   const links: NavLink[] = primaryRole === "admin" ? adminLinks
     : primaryRole === "manager" ? [
       { to: "/manager", label: "Manager", icon: Briefcase, exact: true },
-      { to: "/manager/accounting", label: "Comptabilité", icon: Wallet, permissions: ["can_view_accounting"], exact: true },
       { to: "/pos", label: "POS", icon: ShoppingCart, permissions: ["can_manage_pos"] },
       { to: "/admin/products", label: "Produits", icon: Package, permissions: ["can_manage_products"] },
       { to: "/admin/stock", label: "Stock", icon: Boxes, permissions: ["can_manage_stock"] },
       { to: "/admin/logistics", label: "Commandes", icon: ClipboardList, permissions: ["can_manage_orders", "can_manage_logistics"] },
-      { to: "/admin/wholesale", label: "Vente en gros", icon: HandCoins, permissions: ["can_record_wholesale"] },
+      { to: "/admin/wholesale", label: "Vente en gros", icon: HandCoins, permissions: ["can_view_accounting", "can_record_wholesale"] },
     ]
     : primaryRole === "pos" ? [{ to: "/pos", label: "POS", icon: ShoppingCart, exact: true }]
     : [{ to: "/livreur", label: "Livreur", icon: Truck, exact: true }];
   const visibleLinks = primaryRole === "manager"
-    ? links.filter((link) => roles.includes("admin") || managerLinkVisible(managerPerms.data, link))
+    ? links.filter((link) => !link.permissions?.length || roles.includes("admin") || link.permissions.some((permission) => managerPerms.data?.[permission] === true))
     : links;
 
   return (

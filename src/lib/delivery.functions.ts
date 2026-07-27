@@ -126,3 +126,34 @@ export const upsertCommuneDeliveryFees = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+export const deleteCommuneDeliveryFee = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const ctx = context as any;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: roles } = await ctx.supabase.from("user_roles").select("role").eq("user_id", ctx.userId);
+    const roleList = (roles ?? []).map((r: any) => r.role as string);
+    const isAdmin = roleList.includes("admin");
+    const isManager = roleList.includes("manager");
+    if (!isAdmin && !isManager) throw new Error("Forbidden");
+
+    const scope = isAdmin ? null : await getProfileScope(supabaseAdmin, ctx.userId);
+    if (!isAdmin && !scope) throw new Error("Forbidden: direction non définie");
+
+    const { data: fee, error: fetchErr } = await supabaseAdmin
+      .from("commune_delivery_fees")
+      .select("city, country_code")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!fee) throw new Error("Frais introuvable");
+
+    const city_scope = (await import("@/lib/staff-scope")).directionFromCity(fee.city, fee.country_code);
+    if (!isAdmin && city_scope !== scope) throw new Error("Forbidden: zone hors direction");
+
+    const { error } = await supabaseAdmin.from("commune_delivery_fees").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

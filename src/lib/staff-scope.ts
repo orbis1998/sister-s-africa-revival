@@ -98,7 +98,7 @@ export function formatOrderAmount(order: {
 export const ADMIN_REPORT_REGIONS = [
   { key: "kinshasa", label: "Kinshasa", scopes: ["kinshasa"] as StaffDirection[] },
   { key: "katanga", label: "Katanga", scopes: ["katanga"] as StaffDirection[] },
-  { key: "rd-congo", label: "RD Congo", scopes: ["brazzaville", "pointe-noire"] as StaffDirection[] },
+  { key: "congo", label: "Congo", scopes: ["brazzaville", "pointe-noire"] as StaffDirection[] },
 ] as const;
 
 export function regionLabelForScope(scope?: string | null) {

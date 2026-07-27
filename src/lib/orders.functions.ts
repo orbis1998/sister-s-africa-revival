@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { directionFromCity } from "@/lib/staff-scope";
 import { resolvePosForOrder } from "@/lib/pos-scope";
-import { assertOrderStockAvailable } from "@/lib/stock.functions";
+import { assertOrderStockAvailable, deliverOrderWithStock } from "@/lib/stock.functions";
 
 type Status = "received" | "preparing" | "ready" | "en_route" | "delivered" | "cancelled";
 
@@ -216,15 +216,11 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
       const { data: o } = await supabaseAdmin.from("orders").select("assigned_to").eq("id", data.order_id).single();
       if (!o || o.assigned_to !== ctx.userId) throw new Error("Forbidden");
     }
-    const patch: any = { status: data.status };
     if (data.status === "delivered") {
-      const { error: deliverErr } = await supabaseAdmin.rpc("deliver_order_with_stock", {
-        p_order_id: data.order_id,
-        p_actor: ctx.userId,
-      });
-      if (deliverErr) throw new Error(deliverErr.message);
+      await deliverOrderWithStock(supabaseAdmin, data.order_id, ctx.userId);
       return { ok: true };
     }
+    const patch: any = { status: data.status };
     const { error } = await supabaseAdmin.from("orders").update(patch).eq("id", data.order_id);
     if (error) throw new Error(error.message);
     return { ok: true };
