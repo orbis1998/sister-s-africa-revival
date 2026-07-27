@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated/admin/")({
   component: AdminDashboard,
 });
 
-function Stat({ icon: Icon, label, value, sub, dark }: { icon: any; label: string; value: string | number; sub?: string; dark?: boolean }) {
+function Stat({ icon: Icon, label, value, fcfa, sub, dark }: { icon: any; label: string; value: string | number; fcfa?: string; sub?: string; dark?: boolean }) {
   return (
     <div className={`${dark ? "bg-espresso text-cream border-espresso" : "bg-card border-border"} border rounded-2xl p-6`}>
       <div className="flex items-center justify-between">
@@ -23,6 +23,9 @@ function Stat({ icon: Icon, label, value, sub, dark }: { icon: any; label: strin
         <Icon className="w-4 h-4 text-copper" strokeWidth={1.5} />
       </div>
       <div className="font-display text-4xl mt-2">{value}</div>
+      {fcfa !== undefined && (
+        <div className={`font-display text-4xl mt-1 ${dark ? "text-cream" : "text-espresso"}`}>{fcfa}</div>
+      )}
       {sub && <div className={`text-xs mt-1 ${dark ? "text-cream/60" : "text-muted-foreground"}`}>{sub}</div>}
     </div>
   );
@@ -53,12 +56,12 @@ function sumMoney(rows: any[], date?: Date) {
   );
 }
 
-function formatMoneySplit(value: { usd: number; fcfa: number }) {
-  const usd = value.usd.toFixed(2);
-  const fcfa = value.fcfa.toLocaleString("fr-FR");
-  if (value.usd > 0 && value.fcfa > 0) return `RDC $${usd} · Congo ${fcfa} FCFA`;
-  if (value.fcfa > 0) return `${fcfa} FCFA`;
-  return `$${usd}`;
+function formatUsd(amount: number) {
+  return `$${amount.toFixed(2)}`;
+}
+
+function formatFcfa(amount: number) {
+  return `${amount.toLocaleString("fr-FR")} FCFA`;
 }
 
 function AdminDashboard() {
@@ -221,14 +224,14 @@ function AdminDashboard() {
         </div>
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-        <Stat icon={DollarSign} label="Recette aujourd'hui" value={`$${todayRevenue.usd.toFixed(2)}`} sub={formatMoneySplit(todayRevenue)} dark />
-        <Stat icon={DollarSign} label="Recette il y a 7 jours" value={`$${sevenDaysAgoRevenue.usd.toFixed(2)}`} sub={formatMoneySplit(sevenDaysAgoRevenue)} />
-        <Stat icon={DollarSign} label="Dépenses aujourd'hui" value={`$${todayExpenses.usd.toFixed(2)}`} sub={formatMoneySplit(todayExpenses)} />
-        <Stat icon={TrendingUp} label="Net global" value={`$${(revenue.usd - expenseTotal.usd).toFixed(2)}`} sub={formatMoneySplit({ usd: revenue.usd - expenseTotal.usd, fcfa: revenue.fcfa - expenseTotal.fcfa })} dark />
-        <Stat icon={ClipboardList} label="CA commandes livrées" value={`$${deliveredRevenue.usd.toFixed(2)}`} sub={formatMoneySplit(deliveredRevenue)} />
-        <Stat icon={ShoppingCart} label="CA ventes POS" value={`$${posRevenue.usd.toFixed(2)}`} sub={formatMoneySplit(posRevenue)} />
-        <Stat icon={HandCoins} label="CA ventes en gros" value={`$${wholesaleRevenue.usd.toFixed(2)}`} sub={formatMoneySplit(wholesaleRevenue)} />
-        <Stat icon={Package} label="Valeur stock POS" value={`$${posStockValue.usd.toFixed(2)}`} sub={formatMoneySplit(posStockValue)} />
+        <Stat icon={DollarSign} label="Recette aujourd'hui" value={formatUsd(todayRevenue.usd)} fcfa={formatFcfa(todayRevenue.fcfa)} dark />
+        <Stat icon={DollarSign} label="Recette il y a 7 jours" value={formatUsd(sevenDaysAgoRevenue.usd)} fcfa={formatFcfa(sevenDaysAgoRevenue.fcfa)} />
+        <Stat icon={DollarSign} label="Dépenses aujourd'hui" value={formatUsd(todayExpenses.usd)} fcfa={formatFcfa(todayExpenses.fcfa)} />
+        <Stat icon={TrendingUp} label="Net global" value={formatUsd(revenue.usd - expenseTotal.usd)} fcfa={formatFcfa(revenue.fcfa - expenseTotal.fcfa)} dark />
+        <Stat icon={ClipboardList} label="CA commandes livrées" value={formatUsd(deliveredRevenue.usd)} fcfa={formatFcfa(deliveredRevenue.fcfa)} />
+        <Stat icon={ShoppingCart} label="CA ventes POS" value={formatUsd(posRevenue.usd)} fcfa={formatFcfa(posRevenue.fcfa)} />
+        <Stat icon={HandCoins} label="CA ventes en gros" value={formatUsd(wholesaleRevenue.usd)} fcfa={formatFcfa(wholesaleRevenue.fcfa)} />
+        <Stat icon={Package} label="Valeur stock POS" value={formatUsd(posStockValue.usd)} fcfa={formatFcfa(posStockValue.fcfa)} />
         <Stat icon={Package} label="Produits" value={products?.length ?? 0} />
         <Stat icon={Store} label="Points de vente" value={pos?.length ?? 0} />
         <Stat icon={ClipboardList} label="Commandes en cours" value={pendingOrders} sub={`${orders?.length ?? 0} au total`} />
